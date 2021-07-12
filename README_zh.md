@@ -90,9 +90,9 @@ int main(int argc, char* const argv[])
 	HP_TcpPullAgent s_agent;
 
 	// 1. Create listener object
-	s_listener	= ::Create_HP_TcpPullAgentListener();
+	s_listener = ::Create_HP_TcpPullAgentListener();
 	// 2. Create component object (and binding with listener object)
-	s_agent		= ::Create_HP_TcpPullAgent(s_listener);
+	s_agent    = ::Create_HP_TcpPullAgent(s_listener);
 	
 	/* Set listener callbacks */
 	::HP_Set_FN_Agent_OnConnect(s_listener, OnConnect);
@@ -102,13 +102,13 @@ int main(int argc, char* const argv[])
 	::HP_Set_FN_Agent_OnShutdown(s_listener, OnShutdown);
 	
 	// 3. Start component object
-	if(::HP_Agent_HasStarted(s_agent))
+	if(!::HP_Agent_Start(s_agent, "0.0.0.0", TRUE))
 		exit(1);
 	
 	// 4. Connect to dest host
-	::HP_Agent_Connect(s_agent, "remote.host.1", REMOTE_PORT_1, nullptr);
-	::HP_Agent_Connect(s_agent, "remote.host.2", REMOTE_PORT_2, nullptr);
-	::HP_Agent_Connect(s_agent, "remote.host.3", REMOTE_PORT_3, nullptr);
+	::HP_Agent_Connect(s_agent, REMOTE_HOST_1, REMOTE_PORT_1, nullptr);
+	::HP_Agent_Connect(s_agent, REMOTE_HOST_2, REMOTE_PORT_2, nullptr);
+	::HP_Agent_Connect(s_agent, REMOTE_HOST_3, REMOTE_PORT_3, nullptr);
 	
 	/* wait for exit */
 	// ... ... 
@@ -128,27 +128,35 @@ int main(int argc, char* const argv[])
 ## 组件列表
 - ***基础组件***
 
-![Basic Component](https://images.gitee.com/uploads/images/2019/0331/102422_3eecfdb7_81720.jpeg "基础组件")
+![Basic Component](https://oscimg.oschina.net/oscnet/up-42bad6a83208cda6aaa264ed00e5c328326.JPEG "基础组件")
 
 - ***SSL组件***
 
-![SSL Component](https://gitee.com/uploads/images/2017/1214/143622_d6c1f436_81720.jpeg "SSL 组件")
+![SSL Component](https://oscimg.oschina.net/oscnet/up-481b7e4181c1e57dbe57cf0f4f328d7d227.JPEG "SSL 组件")
 
 - ***HTTP组件***
 
-![HTTP COmponent](https://gitee.com/uploads/images/2017/1214/143640_0eb6f9e4_81720.jpeg "HTTP 组件")
+![HTTP COmponent](https://oscimg.oschina.net/oscnet/up-83092ff97598f275e3ca6b7abed679d4f61.JPEG "HTTP 组件")
 
 ## 引用项目
 
+- *[mimalloc](https://github.com/microsoft/mimalloc)*
 - *[jemalloc](https://github.com/jemalloc/jemalloc)*
 - *[openssl](https://github.com/openssl/openssl)*
-- *[http-parser](https://github.com/nodejs/http-parser)*
+- *[llhttp](https://github.com/nodejs/llhttp)*
 - *[zlib](https://github.com/madler/zlib)*
+- *[brotli](https://github.com/google/brotli)*
 - *[kcp](https://github.com/skywind3000/kcp)*
 
 ## 第三方扩展项目
 
-- *[HP-Socket for macOS](https://gitee.com/xin_chong/HP-Socket-for-macOS)*
+- *[HP-Socket for MacOS](https://gitee.com/xin_chong/HP-Socket-for-macOS)*
+- *[HP-Socket for .Net](https://gitee.com/int2e/HPSocket.Net)*
+
+## 技术交流
+
+- *[怪兽乐园①群](https://shang.qq.com/wpa/qunwpa?idkey=2b69b6331192137e82cf87fc501345f491f53997cd052405cc2f1183c1039b46)*
+- *[怪兽乐园②群](https://shang.qq.com/wpa/qunwpa?idkey=3de8949938b69e213ffc42a18f066abd935f9dd4dc67e6230e7e75450b9a7dee)*
 
 ## 捐赠支持
 

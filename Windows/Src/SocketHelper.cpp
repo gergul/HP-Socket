@@ -1,12 +1,12 @@
-/*
+﻿/*
  * Copyright: JessMA Open Source (ldcsaa@gmail.com)
  *
  * Author	: Bruce Liang
- * Website	: http://www.jessma.org
- * Project	: https://github.com/ldcsaa
+ * Website	: https://github.com/ldcsaa
+ * Project	: https://github.com/ldcsaa/HP-Socket
  * Blog		: http://www.cnblogs.com/ldcsaa
  * Wiki		: http://www.oschina.net/p/hp-socket
- * QQ Group	: 75375912, 44636872
+ * QQ Group	: 44636872, 75375912
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,8 +22,8 @@
  */
  
 #include "stdafx.h"
-#include "../Common/Src/GeneralHelper.h"
-#include "../Common/Src/SysHelper.h"
+#include "Common/GeneralHelper.h"
+#include "Common/SysHelper.h"
 #include "SocketHelper.h"
 
 #include <mstcpip.h>
@@ -37,8 +37,8 @@
 	#endif
 #endif
 
-static const BYTE s_szUdpCloseNotify[]	= {0xBE, 0xB6, 0x1F, 0xEB, 0xDA, 0x52, 0x46, 0xBA, 0x92, 0x33, 0x59, 0xDB, 0xBF, 0xE6, 0xC8, 0xE4};
-static int s_iUdpCloseNotifySize		= ARRAY_SIZE(s_szUdpCloseNotify);
+static const BYTE s_szUdpCloseNotify[] = {0xBE, 0xB6, 0x1F, 0xEB, 0xDA, 0x52, 0x46, 0xBA, 0x92, 0x33, 0x59, 0xDB, 0xBF, 0xE6, 0xC8, 0xE4};
+static const int s_iUdpCloseNotifySize = ARRAY_SIZE(s_szUdpCloseNotify);
 
 const hp_addr hp_addr::ANY_ADDR4(AF_INET, TRUE);
 const hp_addr hp_addr::ANY_ADDR6(AF_INET6, TRUE);
@@ -151,7 +151,7 @@ BOOL GetSockAddrByHostNameDirectly(LPCTSTR lpszHost, USHORT usPort, HP_SOCKADDR&
 	addrinfo* pInfo	= nullptr;
 	addrinfo hints	= {0};
 
-	hints.ai_flags	= AI_ALL;
+	hints.ai_flags	= (AI_V4MAPPED | AI_ADDRCONFIG);
 	hints.ai_family	= addr.family;
 
 	int rs = ::getaddrinfo(CT2A(lpszHost), nullptr, &hints, &pInfo);
@@ -409,6 +409,34 @@ ULONGLONG HToN64(ULONGLONG value)
 	return (((ULONGLONG)htonl((u_long)((value << 32) >> 32))) << 32) | htonl((u_long)(value >> 32));
 }
 
+BOOL IsLittleEndian()
+{
+	static const USHORT _s_endian_test_value = 0x0102;
+	static const BOOL _s_bLE = (*((BYTE*)&_s_endian_test_value) == 0x02);
+
+	return _s_bLE;
+}
+
+USHORT HToLE16(USHORT value)
+{
+	return IsLittleEndian() ? value : ENDIAN_SWAP_16(value);
+}
+
+USHORT HToBE16(USHORT value)
+{
+	return IsLittleEndian() ? ENDIAN_SWAP_16(value) : value;
+}
+
+DWORD HToLE32(DWORD value)
+{
+	return IsLittleEndian() ? value : ENDIAN_SWAP_32(value);
+}
+
+DWORD HToBE32(DWORD value)
+{
+	return IsLittleEndian() ? ENDIAN_SWAP_32(value) : value;
+}
+
 PVOID GetExtensionFuncPtr(SOCKET sock, GUID guid)
 {
 	DWORD dwBytes;
@@ -642,9 +670,44 @@ int SSO_SendBuffSize(SOCKET sock, int size)
 	return setsockopt(sock, SOL_SOCKET, SO_SNDBUF, (CHAR*)&size, sizeof(int));
 }
 
-int SSO_ReuseAddress(SOCKET sock, BOOL bReuse)
+int SSO_RecvTimeOut(SOCKET sock, int ms)
 {
-	return setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (CHAR*)&bReuse, sizeof(BOOL));
+	return setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (CHAR*)&ms, sizeof(int));
+}
+
+int SSO_SendTimeOut(SOCKET sock, int ms)
+{
+	return setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (CHAR*)&ms, sizeof(int));
+}
+
+int SSO_ReuseAddress(SOCKET sock, EnReuseAddressPolicy opt)
+{
+	BOOL bSet	= TRUE;
+	BOOL bUnSet	= FALSE;
+	int rs		= NO_ERROR;
+
+	if(opt == RAP_NONE)
+	{
+		rs  = setsockopt(sock, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, (CHAR*)&bSet, sizeof(BOOL));
+		rs |= setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (CHAR*)&bUnSet, sizeof(BOOL));
+	}
+	else if(opt == RAP_ADDR_ONLY)
+	{
+		rs  = setsockopt(sock, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, (CHAR*)&bUnSet, sizeof(BOOL));
+		rs |= setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (CHAR*)&bUnSet, sizeof(BOOL));
+	}
+	else if(opt == RAP_ADDR_AND_PORT)
+	{
+		rs  = setsockopt(sock, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, (CHAR*)&bUnSet, sizeof(BOOL));
+		rs |= setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (CHAR*)&bSet, sizeof(BOOL));
+	}
+	else
+	{
+		::SetLastError(ERROR_INVALID_PARAMETER);
+		rs = -1;
+	}
+
+	return rs;
 }
 
 int SSO_ExclusiveAddressUse(SOCKET sock, BOOL bExclusive)
@@ -905,27 +968,35 @@ int PostReceiveFrom(SOCKET sock, TUdpBufferObj* pBufferObj)
 int PostReceiveFromNotCheck(SOCKET sock, TUdpBufferObj* pBufferObj)
 {
 	int result				= NO_ERROR;
-	DWORD dwFlag			= 0;
-	DWORD dwBytes			= 0;
 	pBufferObj->operation	= SO_RECEIVE;
 	pBufferObj->addrLen		= pBufferObj->remoteAddr.AddrSize();
 
-	pBufferObj->remoteAddr.ZeroAddr();
-
-	if(::WSARecvFrom(
-						sock,
-						&pBufferObj->buff,
-						1,
-						&dwBytes,
-						&dwFlag,
-						pBufferObj->remoteAddr.Addr(),
-						&pBufferObj->addrLen,
-						&pBufferObj->ov,
-						nullptr
-					) == SOCKET_ERROR)
+	do 
 	{
-		result = ::WSAGetLastError();
-	}
+		DWORD dwFlag	= 0;
+		DWORD dwBytes	= 0;
+
+		if(::WSARecvFrom(
+							sock,
+							&pBufferObj->buff,
+							1,
+							&dwBytes,
+							&dwFlag,
+							pBufferObj->remoteAddr.Addr(),
+							&pBufferObj->addrLen,
+							&pBufferObj->ov,
+							nullptr
+						) == SOCKET_ERROR)
+		{
+			result = ::WSAGetLastError();
+		}
+
+		if(!IS_UDP_RESET_ERROR(result))
+			break;
+
+		pBufferObj->ResetOV();
+
+	} while(TRUE);
 
 	return result;
 }
@@ -942,9 +1013,9 @@ int NoBlockReceive(TBufferObj* pBufferObj)
 
 int NoBlockReceiveNotCheck(TBufferObj* pBufferObj)
 {
-	int result				= NO_ERROR;
-	DWORD dwFlag			= 0;
-	DWORD dwBytes			= 0;
+	int result		= NO_ERROR;
+	DWORD dwFlag	= 0;
+	DWORD dwBytes	= 0;
 
 	if(::WSARecv(
 					pBufferObj->client,
@@ -969,6 +1040,87 @@ int NoBlockReceiveNotCheck(TBufferObj* pBufferObj)
 	return result;
 }
 
+int NoBlockReceiveFrom(SOCKET sock, TUdpBufferObj* pBufferObj)
+{
+	int result = NoBlockReceiveFromNotCheck(sock, pBufferObj);
+
+	if(result == WSAEWOULDBLOCK)
+		result = NO_ERROR;
+
+	return result;
+}
+
+int NoBlockReceiveFromNotCheck(SOCKET sock, TUdpBufferObj* pBufferObj)
+{
+	int result			= NO_ERROR;
+	pBufferObj->addrLen	= pBufferObj->remoteAddr.AddrSize();
+
+	do 
+	{
+		DWORD dwFlag	= 0;
+		DWORD dwBytes	= 0;
+
+		if(::WSARecvFrom(
+							sock,
+							&pBufferObj->buff,
+							1,
+							&dwBytes,
+							&dwFlag,
+							pBufferObj->remoteAddr.Addr(),
+							&pBufferObj->addrLen,
+							nullptr,
+							nullptr
+						) == SOCKET_ERROR)
+		{
+			result = ::WSAGetLastError();
+		}
+		else
+		{
+			if(dwBytes > 0)
+				pBufferObj->buff.len = dwBytes;
+			else
+				result = WSAEDISCON;
+		}
+
+	} while(IS_UDP_RESET_ERROR(result));
+
+
+	return result;
+}
+
+BOOL SetMultiCastSocketOptions(SOCKET sock, const HP_SOCKADDR& bindAddr, const HP_SOCKADDR& castAddr, int iMCTtl, BOOL bMCLoop)
+{
+	if(castAddr.IsIPv4())
+	{
+		ENSURE(::SSO_SetSocketOption(sock, IPPROTO_IP, IP_MULTICAST_TTL, &iMCTtl, sizeof(iMCTtl)) != SOCKET_ERROR);
+		ENSURE(::SSO_SetSocketOption(sock, IPPROTO_IP, IP_MULTICAST_LOOP, &bMCLoop, sizeof(bMCLoop)) != SOCKET_ERROR);
+
+		ip_mreq mcast;
+		::ZeroMemory(&mcast, sizeof(mcast));
+
+		mcast.imr_multiaddr = castAddr.addr4.sin_addr;
+		mcast.imr_interface = bindAddr.addr4.sin_addr;
+
+		if(::SSO_SetSocketOption(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mcast, sizeof(mcast)) == SOCKET_ERROR)
+			return FALSE;
+	}
+	else
+	{
+		ENSURE(::SSO_SetSocketOption(sock, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &iMCTtl, sizeof(iMCTtl)) != SOCKET_ERROR);
+		ENSURE(::SSO_SetSocketOption(sock, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &bMCLoop, sizeof(bMCLoop)) != SOCKET_ERROR);
+
+		ipv6_mreq mcast;
+		::ZeroMemory(&mcast, sizeof(mcast));
+
+		mcast.ipv6mr_multiaddr = castAddr.addr6.sin6_addr;
+		mcast.ipv6mr_interface = bindAddr.addr6.sin6_scope_id;
+
+		if(::SSO_SetSocketOption(sock, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, &mcast, sizeof(mcast)) == SOCKET_ERROR)
+			return FALSE;
+	}
+
+	return TRUE;
+}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1091,112 +1243,6 @@ BOOL Utf8ToGbk(const char szSrc[], char szDest[], int& iDestLength)
 
 	return UnicodeToGbk(p.get(), szDest, iDestLength);
 }
-
-#ifdef _ZLIB_SUPPORT
-
-int Compress(const BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen)
-{
-	return CompressEx(lpszSrc, dwSrcLen, lpszDest, dwDestLen);
-}
-
-int CompressEx(const BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen, int iLevel, int iMethod, int iWindowBits, int iMemLevel, int iStrategy)
-{
-	z_stream stream;
-
-	stream.next_in	 = (z_const Bytef*)lpszSrc;
-	stream.avail_in	 = dwSrcLen;
-	stream.next_out	 = lpszDest;
-	stream.avail_out = dwDestLen;
-	stream.zalloc	 = nullptr;
-	stream.zfree	 = nullptr;
-	stream.opaque	 = nullptr;
-
-	int err = ::deflateInit2(&stream, iLevel, iMethod, iWindowBits, iMemLevel, iStrategy);
-
-	if(err != Z_OK) return err;
-
-	err = ::deflate(&stream, Z_FINISH);
-
-	if(err != Z_STREAM_END)
-	{
-		::deflateEnd(&stream);
-		return err == Z_OK ? Z_BUF_ERROR : err;
-	}
-
-	if(dwDestLen > stream.total_out)
-	{
-		lpszDest[stream.total_out]	= 0;
-		dwDestLen					= stream.total_out;
-	}
-
-	return ::deflateEnd(&stream);
-}
-
-int Uncompress(const BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen)
-{
-	return UncompressEx(lpszSrc, dwSrcLen, lpszDest, dwDestLen);
-}
-
-int UncompressEx(const BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen, int iWindowBits)
-{
-	z_stream stream;
-
-	stream.next_in	 = (z_const Bytef*)lpszSrc;
-	stream.avail_in	 = (uInt)dwSrcLen;
-	stream.next_out	 = lpszDest;
-	stream.avail_out = dwDestLen;
-	stream.zalloc	 = nullptr;
-	stream.zfree	 = nullptr;
-
-	int err = ::inflateInit2(&stream, iWindowBits);
-
-	if(err != Z_OK) return err;
-
-	err = ::inflate(&stream, Z_FINISH);
-
-	if(err != Z_STREAM_END)
-	{
-		::inflateEnd(&stream);
-		return (err == Z_NEED_DICT || (err == Z_BUF_ERROR && stream.avail_in == 0)) ? Z_DATA_ERROR : err;
-	}
-
-	if(dwDestLen > stream.total_out)
-	{
-		lpszDest[stream.total_out]	= 0;
-		dwDestLen					= stream.total_out;
-	}
-
-	return inflateEnd(&stream);
-}
-
-DWORD GuessCompressBound(DWORD dwSrcLen, BOOL bGZip)
-{
-	DWORD dwBound = ::compressBound(dwSrcLen);
-	
-	if(bGZip) dwBound += 11;
-
-	return dwBound;
-}
-
-int GZipCompress(const BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen)
-{
-	return CompressEx(lpszSrc, dwSrcLen, lpszDest, dwDestLen, Z_DEFAULT_COMPRESSION, Z_DEFLATED, MAX_WBITS + 16);
-}
-
-int GZipUncompress(const BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen)
-{
-	return UncompressEx(lpszSrc, dwSrcLen, lpszDest, dwDestLen, MAX_WBITS + 32);
-}
-
-DWORD GZipGuessUncompressBound(const BYTE* lpszSrc, DWORD dwSrcLen)
-{
-	if(dwSrcLen < 20 || *(USHORT*)lpszSrc != 0x8B1F)
-		return 0;
-
-	return *(DWORD*)(lpszSrc + dwSrcLen - 4);
-}
-
-#endif
 
 DWORD GuessBase64EncodeBound(DWORD dwSrcLen)
 {
@@ -1468,3 +1514,141 @@ ERROR_DEST_LEN:
 	dwDestLen = GuessUrlDecodeBound(lpszSrc, dwSrcLen);
 	return -5;
 }
+
+#ifdef _ZLIB_SUPPORT
+
+int Compress(const BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen)
+{
+	return CompressEx(lpszSrc, dwSrcLen, lpszDest, dwDestLen);
+}
+
+int CompressEx(const BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen, int iLevel, int iMethod, int iWindowBits, int iMemLevel, int iStrategy)
+{
+	z_stream stream;
+
+	stream.next_in	 = (z_const Bytef*)lpszSrc;
+	stream.avail_in	 = dwSrcLen;
+	stream.next_out	 = lpszDest;
+	stream.avail_out = dwDestLen;
+	stream.zalloc	 = nullptr;
+	stream.zfree	 = nullptr;
+	stream.opaque	 = nullptr;
+
+	int err = ::deflateInit2(&stream, iLevel, iMethod, iWindowBits, iMemLevel, iStrategy);
+
+	if(err != Z_OK) return err;
+
+	err = ::deflate(&stream, Z_FINISH);
+
+	if(err != Z_STREAM_END)
+	{
+		::deflateEnd(&stream);
+		return err == Z_OK ? Z_BUF_ERROR : err;
+	}
+
+	if(dwDestLen > stream.total_out)
+	{
+		lpszDest[stream.total_out]	= 0;
+		dwDestLen					= stream.total_out;
+	}
+
+	return ::deflateEnd(&stream);
+}
+
+int Uncompress(const BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen)
+{
+	return UncompressEx(lpszSrc, dwSrcLen, lpszDest, dwDestLen);
+}
+
+int UncompressEx(const BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen, int iWindowBits)
+{
+	z_stream stream;
+
+	stream.next_in	 = (z_const Bytef*)lpszSrc;
+	stream.avail_in	 = (uInt)dwSrcLen;
+	stream.next_out	 = lpszDest;
+	stream.avail_out = dwDestLen;
+	stream.zalloc	 = nullptr;
+	stream.zfree	 = nullptr;
+
+	int err = ::inflateInit2(&stream, iWindowBits);
+
+	if(err != Z_OK) return err;
+
+	err = ::inflate(&stream, Z_FINISH);
+
+	if(err != Z_STREAM_END)
+	{
+		::inflateEnd(&stream);
+		return (err == Z_NEED_DICT || (err == Z_BUF_ERROR && stream.avail_in == 0)) ? Z_DATA_ERROR : err;
+	}
+
+	if(dwDestLen > stream.total_out)
+	{
+		lpszDest[stream.total_out]	= 0;
+		dwDestLen					= stream.total_out;
+	}
+
+	return inflateEnd(&stream);
+}
+
+DWORD GuessCompressBound(DWORD dwSrcLen, BOOL bGZip)
+{
+	DWORD dwBound = ::compressBound(dwSrcLen);
+
+	if(bGZip) dwBound += 11;
+
+	return dwBound;
+}
+
+int GZipCompress(const BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen)
+{
+	return CompressEx(lpszSrc, dwSrcLen, lpszDest, dwDestLen, Z_DEFAULT_COMPRESSION, Z_DEFLATED, MAX_WBITS + 16);
+}
+
+int GZipUncompress(const BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen)
+{
+	return UncompressEx(lpszSrc, dwSrcLen, lpszDest, dwDestLen, MAX_WBITS + 32);
+}
+
+DWORD GZipGuessUncompressBound(const BYTE* lpszSrc, DWORD dwSrcLen)
+{
+	if(dwSrcLen < 20 || *(USHORT*)lpszSrc != 0x8B1F)
+		return 0;
+
+	return *(DWORD*)(lpszSrc + dwSrcLen - 4);
+}
+
+#endif
+
+#ifdef _BROTLI_SUPPORT
+
+int BrotliCompress(const BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen)
+{
+	return BrotliCompressEx(lpszSrc, dwSrcLen, lpszDest, dwDestLen, BROTLI_DEFAULT_QUALITY, BROTLI_DEFAULT_WINDOW, BROTLI_DEFAULT_MODE);
+}
+
+int BrotliCompressEx(const BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen, int iQuality, int iWindow, BrotliEncoderMode enMode)
+{
+	size_t stDestLen = (size_t)dwDestLen;
+	int rs = ::BrotliEncoderCompress(iQuality, iWindow, enMode, (size_t)dwSrcLen, lpszSrc, &stDestLen, lpszDest);
+	dwDestLen = (DWORD)stDestLen;
+
+	return (rs == 1) ? 0 : ((rs == 3) ? -5 : -3);
+}
+
+int BrotliUncompress(const BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen)
+{
+	size_t stDestLen = (size_t)dwDestLen;
+	BrotliDecoderResult rs = ::BrotliDecoderDecompress((size_t)dwSrcLen, lpszSrc, &stDestLen, lpszDest);
+	dwDestLen = (DWORD)stDestLen;
+
+	return (rs == BROTLI_DECODER_RESULT_SUCCESS) ? 0 : ((rs == BROTLI_DECODER_RESULT_NEEDS_MORE_OUTPUT) ? -5 : -3);
+}
+
+DWORD BrotliGuessCompressBound(DWORD dwSrcLen)
+{
+	return (DWORD)::BrotliEncoderMaxCompressedSize((size_t)dwSrcLen);
+}
+
+#endif

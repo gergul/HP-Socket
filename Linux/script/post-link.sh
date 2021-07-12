@@ -57,6 +57,14 @@ if [ $(($AR_FLAG & 2)) -gt 0 ]; then
 fi
 
 if [ $(($AR_FLAG & 4)) -gt 0 ]; then
+	add_dependent brotli
+fi
+
+if [ $(($AR_FLAG & 8)) -gt 0 ]; then
+	add_dependent mimalloc
+fi
+
+if [ $(($AR_FLAG & 16)) -gt 0 ]; then
 	add_dependent jemalloc_pic
 fi
 

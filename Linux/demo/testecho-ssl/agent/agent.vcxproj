@@ -146,8 +146,8 @@
     <ClInclude Include="..\..\..\src\common\FileHelper.h" />
     <ClInclude Include="..\..\..\src\common\FuncHelper.h" />
     <ClInclude Include="..\..\..\src\common\GeneralHelper.h" />
-    <ClInclude Include="..\..\..\src\common\GlobalDef.h" />
-    <ClInclude Include="..\..\..\src\common\GlobalErrno.h" />
+    <ClInclude Include="..\..\..\include\hpsocket\GlobalDef.h" />
+    <ClInclude Include="..\..\..\include\hpsocket\GlobalErrno.h" />
     <ClInclude Include="..\..\..\src\common\IODispatcher.h" />
     <ClInclude Include="..\..\..\src\common\PollHelper.h" />
     <ClInclude Include="..\..\..\src\common\PrivateHeap.h" />
@@ -160,9 +160,9 @@
     <ClInclude Include="..\..\..\src\common\StringT.h" />
     <ClInclude Include="..\..\..\src\common\SysHelper.h" />
     <ClInclude Include="..\..\..\src\common\Thread.h" />
-    <ClInclude Include="..\..\..\src\HPTypeDef.h" />
+    <ClInclude Include="..\..\..\include\hpsocket\HPTypeDef.h" />
     <ClInclude Include="..\..\..\src\SocketHelper.h" />
-    <ClInclude Include="..\..\..\src\SocketInterface.h" />
+    <ClInclude Include="..\..\..\include\hpsocket\SocketInterface.h" />
     <ClInclude Include="..\..\..\src\SSLAgent.h" />
     <ClInclude Include="..\..\..\src\SSLHelper.h" />
     <ClInclude Include="..\..\..\src\TcpAgent.h" />
@@ -174,7 +174,7 @@
       <CppLanguageStandard>c++1y</CppLanguageStandard>
       <SymbolsHiddenByDefault>true</SymbolsHiddenByDefault>
       <AdditionalIncludeDirectories>../../../dependent/$(Platform)/include;$(StlIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_ZLIB_DISABLED;_NEED_SSL;</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_UDP_DISABLED;_HTTP_DISABLED;_ZLIB_DISABLED;_BROTLI_DISABLED;_NEED_SSL;</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <LibraryDependencies>ssl;crypto;rt;dl;pthread</LibraryDependencies>
@@ -189,10 +189,10 @@
       <DebugInformationFormat>None</DebugInformationFormat>
       <SymbolsHiddenByDefault>true</SymbolsHiddenByDefault>
       <AdditionalIncludeDirectories>../../../dependent/$(Platform)/include;$(StlIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_ZLIB_DISABLED;_NEED_SSL;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_UDP_DISABLED;_HTTP_DISABLED;_ZLIB_DISABLED;_BROTLI_DISABLED;_NEED_SSL;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
-      <LibraryDependencies>jemalloc_pic;ssl;crypto;rt;dl;pthread</LibraryDependencies>
+      <LibraryDependencies>mimalloc;ssl;crypto;rt;dl;pthread</LibraryDependencies>
       <AdditionalLibraryDirectories>../../../dependent/$(Platform)/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalOptions>-L"$(RemoteRootDir)/../dependent/$(Platform)/lib" %(AdditionalOptions)</AdditionalOptions>
     </Link>
@@ -203,7 +203,7 @@
       <CppLanguageStandard>c++1y</CppLanguageStandard>
       <SymbolsHiddenByDefault>true</SymbolsHiddenByDefault>
       <AdditionalIncludeDirectories>../../../dependent/$(Platform)/include;$(StlIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_ZLIB_DISABLED;_NEED_SSL;</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_UDP_DISABLED;_HTTP_DISABLED;_ZLIB_DISABLED;_BROTLI_DISABLED;_NEED_SSL;</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <LibraryDependencies>ssl;crypto;rt;dl;pthread</LibraryDependencies>
@@ -218,10 +218,10 @@
       <DebugInformationFormat>None</DebugInformationFormat>
       <SymbolsHiddenByDefault>true</SymbolsHiddenByDefault>
       <AdditionalIncludeDirectories>../../../dependent/$(Platform)/include;$(StlIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_ZLIB_DISABLED;_NEED_SSL;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_UDP_DISABLED;_HTTP_DISABLED;_ZLIB_DISABLED;_BROTLI_DISABLED;_NEED_SSL;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
-      <LibraryDependencies>jemalloc_pic;ssl;crypto;rt;dl;pthread</LibraryDependencies>
+      <LibraryDependencies>mimalloc;ssl;crypto;rt;dl;pthread</LibraryDependencies>
       <AdditionalLibraryDirectories>../../../dependent/$(Platform)/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalOptions>-L"$(RemoteRootDir)/../dependent/$(Platform)/lib" %(AdditionalOptions)</AdditionalOptions>
     </Link>
@@ -232,7 +232,7 @@
       <CppLanguageStandard>c++1y</CppLanguageStandard>
       <SymbolsHiddenByDefault>true</SymbolsHiddenByDefault>
       <AdditionalIncludeDirectories>../../../dependent/$(Platform)/include;$(StlIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_ZLIB_DISABLED;_NEED_SSL;</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_UDP_DISABLED;_HTTP_DISABLED;_ZLIB_DISABLED;_BROTLI_DISABLED;_NEED_SSL;</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <LibraryDependencies>ssl;crypto;rt;dl;pthread</LibraryDependencies>
@@ -247,10 +247,10 @@
       <DebugInformationFormat>None</DebugInformationFormat>
       <SymbolsHiddenByDefault>true</SymbolsHiddenByDefault>
       <AdditionalIncludeDirectories>../../../dependent/$(Platform)/include;$(StlIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_ZLIB_DISABLED;_NEED_SSL;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_UDP_DISABLED;_HTTP_DISABLED;_ZLIB_DISABLED;_BROTLI_DISABLED;_NEED_SSL;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
-      <LibraryDependencies>jemalloc_pic;ssl;crypto;rt;dl;pthread</LibraryDependencies>
+      <LibraryDependencies>mimalloc;ssl;crypto;rt;dl;pthread</LibraryDependencies>
       <AdditionalLibraryDirectories>../../../dependent/$(Platform)/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalOptions>-L"$(RemoteRootDir)/../dependent/$(Platform)/lib" %(AdditionalOptions)</AdditionalOptions>
     </Link>

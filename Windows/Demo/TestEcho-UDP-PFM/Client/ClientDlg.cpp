@@ -6,7 +6,7 @@
 #include "Client.h"
 #include "ClientDlg.h"
 #include "afxdialogex.h"
-#include "../../../Common/Src/WaitFor.h"
+#include "../../../Src/Common/WaitFor.h"
 
 #ifdef _WIN64
 	#ifdef _DEBUG
@@ -354,7 +354,7 @@ LRESULT CClientDlg::OnUserInfoMsg(WPARAM wp, LPARAM lp)
 
 EnHandleResult CClientDlg::OnPrepareConnect(IUdpClient* pSender, CONNID dwConnID, SOCKET socket)
 {
-	VERIFY(::SYS_SSO_RecvBuffSize(socket, 64 * 1024) == NO_ERROR);
+	VERIFY(::SYS_SSO_RecvBuffSize(socket, 256 * 1024) == NO_ERROR);
 
 	return HR_OK;
 }

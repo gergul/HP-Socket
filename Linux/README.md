@@ -1,4 +1,4 @@
-# HP-Socket for Linx
+# HP-Socket for Linux
 &nbsp;&nbsp;&nbsp;&nbsp;The exported API of HP-Socket for Linux is consistent with HP-Socket for Windows, but the implementation code is completely separated. HP-Socket for Linux uses the features of the *C++14* standard, and thus need to be compiled by a compiler which version is *GCC 5.x* and above, and the compilation and execution environments of HP-Socket requires Linux kernel version *2.6.32* and above.   
 ## Compilation
 &nbsp;&nbsp;&nbsp;&nbsp;Binary library files and sample executable files are available in the HP-Socket distribution. These files were compiled with GCC 6.3.1 under Linux kernel version 2.6.32. Alternatively, you can compile these files using the following two options:
@@ -9,16 +9,18 @@ $ ./compile.sh -h
 Usage: compile.sh [...O.P.T.I.O.N.S...]
 ----------------------+-------------------------------------------------
   -d|--with-debug-lib : compile debug libs (default: true)
-  -j|--use-jemalloc   : use jemalloc in release libs
-                      : (x86/x64 default: true, ARM default: false)
+  -m|--mem-allocator  : memory allocator (default: mimalloc)
+                      : (options: mimalloc / jemalloc / system)
   -u|--udp-enabled    : enable UDP components (default: true)
   -t|--http-enabled   : enable HTTP components (default: true)
   -s|--ssl-enabled    : enable SSL components (default: true)
   -z|--zlib-enabled   : enable ZLIB related functions (default: true)
+  -b|--brotli-enabled : enable BROTLI related functions
+                      : (x86/x64 default: true, arm/arm64 default: false)
   -i|--iconv-enabled  : enable ICONV related functions (default: true)
   -c|--compiler       : compiler (default: g++)
-  -p|--platform       : platform: x86 / x64 / ARM
-                      : (default: current machine arch platform)  
+  -p|--platform       : platform: x86 / x64 / arm / arm64
+                      : (default: current machine arch platform)
   -e|--clean          : clean compilation intermediate temp files
   -r|--remove         : remove all compilation target files
   -v|--version        : print hp-socket version
@@ -30,14 +32,14 @@ Usage: compile.sh [...O.P.T.I.O.N.S...]
 ```
 $ sudo ./install.sh -h
 Usage: install.sh [...O.P.T.I.O.N.S...]
------------------+------------------------------------------------------
+-----------------+-------------------------------------------------------
   -p|--prefix    : install/uninstall path (default: /usr/local)
-  -l|--libdir    : lib dir (x86/ARM default: 'lib', x64 default: 'lib64')
+  -l|--libdir    : lib dir (x86/arm default: 'lib', x64/arm64 default: 'lib64')
   -d|--with-demo : install demos or not (default: false)
   -u|--uninstall : execute uninstall operation from install path
   -v|--version   : print hp-socket version
   -h|--help      : print this usage message
------------------+------------------------------------------------------
+-----------------+-------------------------------------------------------
 ```
   
 *&nbsp;&nbsp;&nbsp;&nbsp;Note: The **complle.sh** build script depends on the **script/**, **src/**, **include/**, and **dependent/** directories of the distribution; the **install.sh** install script depends on the **script/**, **include/**, and **lib/** directories of the distribution, if you want to install the sample executable files, it also need to depends on the **demo/Release/** directory.*
@@ -57,11 +59,12 @@ $ ./build-android-ndk.sh
 $ ./build-android-ndk.sh APP_ABI=armeabi-v7a,x86
 ```
 ### Features
-&nbsp;&nbsp;&nbsp;&nbsp;By default, all optional features (*UDP, SSL, HTTP, ZLIB, ICONV*) were enabled. You can set one or more ***_XXX_DISABLED=true*** parameters for *build-android-ndk.sh* to disable corresponding features.  
+&nbsp;&nbsp;&nbsp;&nbsp;By default, all optional features (*UDP, SSL, HTTP, ZLIB, BROTLI, ICONV*) were enabled. You can set one or more ***_XXX_DISABLED=true*** parameters for *build-android-ndk.sh* to disable corresponding features.  
   - *_UDP_DISABLED=true*&nbsp;&nbsp;&nbsp;(disable UDP)
   - *_SSL_DISABLED=true*&nbsp;&nbsp;&nbsp;(disable SSL)
   - *_HTTP_DISABLED=true*&nbsp;&nbsp;(disable HTTP)
   - *_ZLIB_DISABLED=true*&nbsp;&nbsp;(disable ZLIB)
+  - *_BROTLI_DISABLED=true*&nbsp;&nbsp;(disable BROTLI)
   - *_ICONV_DISABLED=true*&nbsp;(disable ICONV)
 
 &nbsp;&nbsp;&nbsp;&nbsp;(for example: disable *SSL* and *ICONV* features):

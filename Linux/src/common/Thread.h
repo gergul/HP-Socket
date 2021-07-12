@@ -1,12 +1,12 @@
-﻿/*
+/*
 * Copyright: JessMA Open Source (ldcsaa@gmail.com)
 *
 * Author	: Bruce Liang
-* Website	: http://www.jessma.org
-* Project	: https://github.com/ldcsaa
+* Website	: https://github.com/ldcsaa
+* Project	: https://github.com/ldcsaa/HP-Socket
 * Blog		: http://www.cnblogs.com/ldcsaa
 * Wiki		: http://www.oschina.net/p/hp-socket
-* QQ Group	: 75375912, 44636872
+* QQ Group	: 44636872, 75375912
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -23,8 +23,8 @@
 
 #pragma once
 
-#include "GlobalDef.h"
-#include "GlobalErrno.h"
+#include "../../include/hpsocket/GlobalDef.h"
+#include "../../include/hpsocket/GlobalErrno.h"
 #include "RWLock.h"
 #include "STLHelper.h"
 
@@ -377,7 +377,7 @@ public:
 		return pValue;
 	}
 
-	template<typename  ... _Con_Param> T* Get(_Con_Param&& ... construct_args)
+	template<typename ... _Con_Param> T* Get(_Con_Param&& ... construct_args)
 	{
 		T* pValue = TryGet();
 
@@ -392,7 +392,7 @@ public:
 		return pValue;
 	}
 
-	template<typename  ... _Con_Param> T& GetRef(_Con_Param&& ... construct_args)
+	template<typename ... _Con_Param> T& GetRef(_Con_Param&& ... construct_args)
 	{
 		return *Get(forward<_Con_Param>(construct_args) ...);
 	}
@@ -471,7 +471,7 @@ private:
 			delete pValue;
 	}
 
-	template<typename  ... _Con_Param> static inline T* Construct(_Con_Param&& ... construct_args)
+	template<typename ... _Con_Param> static inline T* Construct(_Con_Param&& ... construct_args)
 	{
 		return new T(forward<_Con_Param>(construct_args) ...);
 	}

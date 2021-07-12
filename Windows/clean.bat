@@ -23,14 +23,15 @@ for /f "delims=" %%i in ('dir /ad /b /s "obj"') do (
    rd /s /q "%%i"
 )
 
+for /f "delims=" %%i in ('dir /ad /b /s ".vs"') do (
+   rd /s /q "%%i"
+)
+
 for /f "delims=" %%i in ('dir /ad /b /s "netstandard2.0"') do (
    rd /s /q "%%i"
 )
 
 rd /s /q "Demo\Debug"
-
-rd /s /q "Other Languages\C#\HPSocketCS\bin\Debug"
-rd /s /q "Other Languages\C#\HPSocketCS\bin\Release"
 
 set /a x=0
 

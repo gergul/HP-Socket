@@ -2,11 +2,11 @@
  * Copyright: JessMA Open Source (ldcsaa@gmail.com)
  *
  * Author	: Bruce Liang
- * Website	: http://www.jessma.org
- * Project	: https://github.com/ldcsaa
+ * Website	: https://github.com/ldcsaa
+ * Project	: https://github.com/ldcsaa/HP-Socket
  * Blog		: http://www.cnblogs.com/ldcsaa
  * Wiki		: http://www.oschina.net/p/hp-socket
- * QQ Group	: 75375912, 44636872
+ * QQ Group	: 44636872, 75375912
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,9 +50,6 @@ CCookie* CCookie::FromString(const CStringA& strCookie, LPCSTR lpszDefaultDomain
 		CStringA strField = strCookie.Tokenize(COOKIE_FIELD_SEP, iStart);
 		strField.Trim();
 
-		if(strField.IsEmpty())
-			break;
-
 		if(i == 0)
 		{
 			ParseFieldKV(strField, strName, strValue, COOKIE_KV_SEP_CHAR);
@@ -62,6 +59,9 @@ CCookie* CCookie::FromString(const CStringA& strCookie, LPCSTR lpszDefaultDomain
 		}
 		else
 		{
+			if(strField.IsEmpty())
+				break;
+
 			CStringA strKey;
 			CStringA strVal;
 
@@ -224,7 +224,7 @@ BOOL CCookie::ParseExpires(LPCSTR lpszExpires, __time64_t& tmExpires)
 
 	tm t = {0};
 
-	if(sscanf(	lpszExpires, "%*[^, ]%*[, ]%2d%*[-/ ]%8[^-/ ]%*[-/ ]%4d %2d:%2d:%2d %8c", 
+	if(sscanf(	lpszExpires, "%*[^, ]%*[, ]%2d%*[-/ ]%8[^-/ ]%*[-/ ]%4d %2d:%2d:%2d %8s", 
 				&t.tm_mday, szMonth, &t.tm_year, &t.tm_hour, &t.tm_min, &t.tm_sec, szZone) != 7)
 		return FALSE;
 

@@ -11,5 +11,11 @@
 #define _USE_MFC
 #define _DETECT_MEMORY_LEAK
 
-#include "../../../Common/Src/GeneralHelper.h"
+#define _UDP_DISABLED			// 禁用 UDP
+#define _SSL_DISABLED			// 禁用 SSL
+#define _HTTP_DISABLED			// 禁用 HTTP
+#define _ZLIB_DISABLED			// 禁用 ZLIB
+#define _BROTLI_DISABLED		// 禁用 BROTLI
+
+#include "../../../Src/Common/GeneralHelper.h"
 

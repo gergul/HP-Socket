@@ -1,12 +1,12 @@
-﻿/*
+/*
  * Copyright: JessMA Open Source (ldcsaa@gmail.com)
  *
  * Author	: Bruce Liang
- * Website	: http://www.jessma.org
- * Project	: https://github.com/ldcsaa
+ * Website	: https://github.com/ldcsaa
+ * Project	: https://github.com/ldcsaa/HP-Socket
  * Blog		: http://www.cnblogs.com/ldcsaa
  * Wiki		: http://www.oschina.net/p/hp-socket
- * QQ Group	: 75375912, 44636872
+ * QQ Group	: 44636872, 75375912
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@
  * limitations under the License.
  */
  
-#include "HPSocket.h"
+#include "../include/hpsocket/HPSocket.h"
 #include "TcpServer.h"
 #include "TcpAgent.h"
 #include "TcpClient.h"
@@ -37,6 +37,7 @@
 #include "UdpServer.h"
 #include "UdpClient.h"
 #include "UdpCast.h"
+#include "UdpNode.h"
 #include "UdpArqServer.h"
 #include "UdpArqClient.h"
 #endif
@@ -158,6 +159,11 @@ HPSOCKET_API IUdpCast* HP_Create_UdpCast(IUdpCastListener* pListener)
 	return new CUdpCast(pListener);
 }
 
+HPSOCKET_API IUdpNode* HP_Create_UdpNode(IUdpNodeListener* pListener)
+{
+	return new CUdpNode(pListener);
+}
+
 HPSOCKET_API IUdpArqServer* HP_Create_UdpArqServer(IUdpServerListener* pListener)
 {
 	return (IUdpArqServer*)(new CUdpArqServer(pListener));
@@ -181,6 +187,11 @@ HPSOCKET_API void HP_Destroy_UdpClient(IUdpClient* pClient)
 HPSOCKET_API void HP_Destroy_UdpCast(IUdpCast* pCast)
 {
 	delete pCast;
+}
+
+HPSOCKET_API void HP_Destroy_UdpNode(IUdpNode* pNode)
+{
+	delete pNode;
 }
 
 HPSOCKET_API void HP_Destroy_UdpArqServer(IUdpArqServer* pServer)
@@ -269,9 +280,19 @@ HPSOCKET_API int SYS_SSO_SendBuffSize(SOCKET sock, int size)
 	return ::SSO_SendBuffSize(sock, size);
 }
 
-HPSOCKET_API int SYS_SSO_ReuseAddress(SOCKET sock, BOOL bReuse)
+HPSOCKET_API int SYS_SSO_RecvTimeOut(SOCKET sock, int ms)
 {
-	return ::SSO_ReuseAddress(sock, bReuse);
+	return ::SSO_RecvTimeOut(sock, ms);
+}
+
+HPSOCKET_API int SYS_SSO_SendTimeOut(SOCKET sock, int ms)
+{
+	return ::SSO_SendTimeOut(sock, ms);
+}
+
+HPSOCKET_API int SYS_SSO_ReuseAddress(SOCKET sock, EnReuseAddressPolicy opt)
+{
+	return ::SSO_ReuseAddress(sock, opt);
 }
 
 HPSOCKET_API BOOL SYS_GetSocketLocalAddress(SOCKET socket, TCHAR lpszAddress[], int& iAddressLen, USHORT& usPort)
@@ -314,6 +335,21 @@ HPSOCKET_API ULONGLONG SYS_HToN64(ULONGLONG value)
 	return ::HToN64(value);
 }
 
+HPSOCKET_API USHORT SYS_SwapEndian16(USHORT value)
+{
+	return ENDIAN_SWAP_16(value);
+}
+
+HPSOCKET_API DWORD SYS_SwapEndian32(DWORD value)
+{
+	return ENDIAN_SWAP_32(value);
+}
+
+HPSOCKET_API BOOL SYS_IsLittleEndian()
+{
+	return ::IsLittleEndian();
+}
+
 HPSOCKET_API LPBYTE SYS_Malloc(int size)
 {
 	return MALLOC(BYTE, size);
@@ -329,44 +365,45 @@ HPSOCKET_API VOID SYS_Free(LPBYTE p)
 	FREE(p);
 }
 
-#ifdef _ICONV_SUPPORT
-
-HPSOCKET_API BOOL SYS_CharsetConvert(LPCSTR lpszFromCharset, LPCSTR lpszToCharset, LPCSTR lpszInBuf, int iInBufLen, LPSTR lpszOutBuf, int& iOutBufLen)
+HPSOCKET_API DWORD SYS_GuessBase64EncodeBound(DWORD dwSrcLen)
 {
-	return ::CharsetConvert(lpszFromCharset, lpszToCharset, lpszInBuf, iInBufLen, lpszOutBuf, iOutBufLen);
+	return ::GuessBase64EncodeBound(dwSrcLen);
 }
 
-HPSOCKET_API BOOL SYS_GbkToUnicode(const char szSrc[], WCHAR szDest[], int& iDestLength)
+HPSOCKET_API DWORD SYS_GuessBase64DecodeBound(const BYTE* lpszSrc, DWORD dwSrcLen)
 {
-	return ::GbkToUnicode(szSrc, szDest, iDestLength);
+	return ::GuessBase64DecodeBound(lpszSrc, dwSrcLen);
 }
 
-HPSOCKET_API BOOL SYS_UnicodeToGbk(const WCHAR szSrc[], char szDest[], int& iDestLength)
+HPSOCKET_API int SYS_Base64Encode(const BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen)
 {
-	return ::UnicodeToGbk(szSrc, szDest, iDestLength);
+	return ::Base64Encode(lpszSrc, dwSrcLen, lpszDest, dwDestLen);
 }
 
-HPSOCKET_API BOOL SYS_Utf8ToUnicode(const char szSrc[], WCHAR szDest[], int& iDestLength)
+HPSOCKET_API int SYS_Base64Decode(const BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen)
 {
-	return ::Utf8ToUnicode(szSrc, szDest, iDestLength);
+	return ::Base64Decode(lpszSrc, dwSrcLen, lpszDest, dwDestLen);
 }
 
-HPSOCKET_API BOOL SYS_UnicodeToUtf8(const WCHAR szSrc[], char szDest[], int& iDestLength)
+HPSOCKET_API DWORD SYS_GuessUrlEncodeBound(const BYTE* lpszSrc, DWORD dwSrcLen)
 {
-	return ::UnicodeToUtf8(szSrc, szDest, iDestLength);
+	return ::GuessUrlEncodeBound(lpszSrc, dwSrcLen);
 }
 
-HPSOCKET_API BOOL SYS_GbkToUtf8(const char szSrc[], char szDest[], int& iDestLength)
+HPSOCKET_API DWORD SYS_GuessUrlDecodeBound(const BYTE* lpszSrc, DWORD dwSrcLen)
 {
-	return ::GbkToUtf8(szSrc, szDest, iDestLength);
+	return ::GuessUrlDecodeBound(lpszSrc, dwSrcLen);
 }
 
-HPSOCKET_API BOOL SYS_Utf8ToGbk(const char szSrc[], char szDest[], int& iDestLength)
+HPSOCKET_API int SYS_UrlEncode(BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen)
 {
-	return ::Utf8ToGbk(szSrc, szDest, iDestLength);
+	return ::UrlEncode(lpszSrc, dwSrcLen, lpszDest, dwDestLen);
 }
 
-#endif
+HPSOCKET_API int SYS_UrlDecode(BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen)
+{
+	return ::UrlDecode(lpszSrc, dwSrcLen, lpszDest, dwDestLen);
+}
 
 #ifdef _ZLIB_SUPPORT
 
@@ -412,45 +449,68 @@ HPSOCKET_API DWORD SYS_GZipGuessUncompressBound(const BYTE* lpszSrc, DWORD dwSrc
 
 #endif
 
-HPSOCKET_API DWORD SYS_GuessBase64EncodeBound(DWORD dwSrcLen)
+#ifdef _BROTLI_SUPPORT
+
+HPSOCKET_API int SYS_BrotliCompress(const BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen)
 {
-	return ::GuessBase64EncodeBound(dwSrcLen);
+	return ::BrotliCompress(lpszSrc, dwSrcLen, lpszDest, dwDestLen);
 }
 
-HPSOCKET_API DWORD SYS_GuessBase64DecodeBound(const BYTE* lpszSrc, DWORD dwSrcLen)
+HPSOCKET_API int SYS_BrotliCompressEx(const BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen, int iQuality, int iWindow, int iMode)
 {
-	return ::GuessBase64DecodeBound(lpszSrc, dwSrcLen);
+	return ::BrotliCompressEx(lpszSrc, dwSrcLen, lpszDest, dwDestLen, iQuality, iWindow, (BrotliEncoderMode)iMode);
 }
 
-HPSOCKET_API int SYS_Base64Encode(const BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen)
+HPSOCKET_API int SYS_BrotliUncompress(const BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen)
 {
-	return ::Base64Encode(lpszSrc, dwSrcLen, lpszDest, dwDestLen);
+	return ::BrotliUncompress(lpszSrc, dwSrcLen, lpszDest, dwDestLen);
 }
 
-HPSOCKET_API int SYS_Base64Decode(const BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen)
+HPSOCKET_API DWORD SYS_BrotliGuessCompressBound(DWORD dwSrcLen)
 {
-	return ::Base64Decode(lpszSrc, dwSrcLen, lpszDest, dwDestLen);
+	return ::BrotliGuessCompressBound(dwSrcLen);
 }
 
-HPSOCKET_API DWORD SYS_GuessUrlEncodeBound(const BYTE* lpszSrc, DWORD dwSrcLen)
+#endif
+
+#ifdef _ICONV_SUPPORT
+
+HPSOCKET_API BOOL SYS_CharsetConvert(LPCSTR lpszFromCharset, LPCSTR lpszToCharset, LPCSTR lpszInBuf, int iInBufLen, LPSTR lpszOutBuf, int& iOutBufLen)
 {
-	return ::GuessUrlEncodeBound(lpszSrc, dwSrcLen);
+	return ::CharsetConvert(lpszFromCharset, lpszToCharset, lpszInBuf, iInBufLen, lpszOutBuf, iOutBufLen);
 }
 
-HPSOCKET_API DWORD SYS_GuessUrlDecodeBound(const BYTE* lpszSrc, DWORD dwSrcLen)
+HPSOCKET_API BOOL SYS_GbkToUnicode(const char szSrc[], WCHAR szDest[], int& iDestLength)
 {
-	return ::GuessUrlDecodeBound(lpszSrc, dwSrcLen);
+	return ::GbkToUnicode(szSrc, szDest, iDestLength);
 }
 
-HPSOCKET_API int SYS_UrlEncode(BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen)
+HPSOCKET_API BOOL SYS_UnicodeToGbk(const WCHAR szSrc[], char szDest[], int& iDestLength)
 {
-	return ::UrlEncode(lpszSrc, dwSrcLen, lpszDest, dwDestLen);
+	return ::UnicodeToGbk(szSrc, szDest, iDestLength);
 }
 
-HPSOCKET_API int SYS_UrlDecode(BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen)
+HPSOCKET_API BOOL SYS_Utf8ToUnicode(const char szSrc[], WCHAR szDest[], int& iDestLength)
 {
-	return ::UrlDecode(lpszSrc, dwSrcLen, lpszDest, dwDestLen);
+	return ::Utf8ToUnicode(szSrc, szDest, iDestLength);
 }
+
+HPSOCKET_API BOOL SYS_UnicodeToUtf8(const WCHAR szSrc[], char szDest[], int& iDestLength)
+{
+	return ::UnicodeToUtf8(szSrc, szDest, iDestLength);
+}
+
+HPSOCKET_API BOOL SYS_GbkToUtf8(const char szSrc[], char szDest[], int& iDestLength)
+{
+	return ::GbkToUtf8(szSrc, szDest, iDestLength);
+}
+
+HPSOCKET_API BOOL SYS_Utf8ToGbk(const char szSrc[], char szDest[], int& iDestLength)
+{
+	return ::Utf8ToGbk(szSrc, szDest, iDestLength);
+}
+
+#endif
 
 /*****************************************************************************************************************************************************/
 /******************************************************************** HTTP Exports *******************************************************************/

@@ -1,12 +1,12 @@
-/*
+ï»¿/*
  * Copyright: JessMA Open Source (ldcsaa@gmail.com)
  *
  * Author	: Bruce Liang
- * Website	: http://www.jessma.org
- * Project	: https://github.com/ldcsaa
+ * Website	: https://github.com/ldcsaa
+ * Project	: https://github.com/ldcsaa/HP-Socket
  * Blog		: http://www.cnblogs.com/ldcsaa
  * Wiki		: http://www.oschina.net/p/hp-socket
- * QQ Group	: 75375912, 44636872
+ * QQ Group	: 44636872, 75375912
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,15 +23,15 @@
  
 #pragma once
 
-#include "HPTypeDef.h"
+#include "../Include/HPSocket/HPTypeDef.h"
 
 #ifdef _UDP_SUPPORT
 
 #include "SocketHelper.h"
 
-#include "../Common/Src/WaitFor.h"
-#include "../Common/Src/BufferPool.h"
-#include "../Common/Src/kcp/ikcp.h"
+#include "Common/WaitFor.h"
+#include "Common/BufferPool.h"
+#include "Common/kcp/ikcp.h"
 
 #define DEFAULT_ARQ_NO_DELAY			FALSE
 #define DEFAULT_ARQ_TURNOFF_NC			FALSE
@@ -40,6 +40,7 @@
 #define DEFAULT_ARQ_SEND_WND_SIZE		128
 #define DEFAULT_ARQ_RECV_WND_SIZE		512
 #define DEFAULT_ARQ_MIN_RTO				30
+#define DEFAULT_ARQ_FAST_LIMIT			5
 #define DEFAULT_ARQ_MAX_TRANS_UNIT		DEFAULT_UDP_MAX_DATAGRAM_SIZE
 #define DEFAULT_ARQ_MAX_MSG_SIZE		DEFAULT_BUFFER_CACHE_CAPACITY
 #define DEFAULT_ARQ_HANND_SHAKE_TIMEOUT	5000
@@ -54,14 +55,14 @@ typedef int (*Fn_ArqOutputProc)(const char* pBuffer, int iLength, IKCPCB* kcp, L
 DWORD GenerateConversationID();
 
 /************************************************************************
-Ãû³Æ£ºARQ ÎÕÊÖ×´Ì¬
-ÃèÊö£º±êÊ¶µ±Ç°Á¬½ÓµÄ ARQ ÎÕÊÖ×´Ì¬
+åç§°ï¼šARQ æ¡æ‰‹çŠ¶æ€
+æè¿°ï¼šæ ‡è¯†å½“å‰è¿žæŽ¥çš„ ARQ æ¡æ‰‹çŠ¶æ€
 ************************************************************************/
 enum EnArqHandShakeStatus
 {
-	ARQ_HSS_INIT	= 0,	// ³õÊ¼×´Ì¬
-	ARQ_HSS_PROC	= 1,	// ÕýÔÚÎÕÊÖ
-	ARQ_HSS_SUCC	= 2,	// ÎÕÊÖ³É¹¦
+	ARQ_HSS_INIT	= 0,	// åˆå§‹çŠ¶æ€
+	ARQ_HSS_PROC	= 1,	// æ­£åœ¨æ¡æ‰‹
+	ARQ_HSS_SUCC	= 2,	// æ¡æ‰‹æˆåŠŸ
 };
 
 struct TArqCmd
@@ -138,6 +139,7 @@ struct TArqAttr
 	DWORD	dwRecvWndSize;
 	DWORD	dwMinRto;
 	DWORD	dwMtu;
+	DWORD	dwFastLimit;
 	DWORD	dwMaxMessageSize;
 	DWORD	dwHandShakeTimeout;
 
@@ -150,6 +152,7 @@ public:
 			, DWORD recv_wnd_size		= DEFAULT_ARQ_RECV_WND_SIZE
 			, DWORD min_rto				= DEFAULT_ARQ_MIN_RTO
 			, DWORD mtu					= DEFAULT_ARQ_MAX_TRANS_UNIT
+			, DWORD fast_limit			= DEFAULT_ARQ_FAST_LIMIT
 			, DWORD max_msg_size		= DEFAULT_ARQ_MAX_MSG_SIZE
 			, DWORD hand_shake_timeout	= DEFAULT_ARQ_HANND_SHAKE_TIMEOUT
 			)
@@ -161,6 +164,7 @@ public:
 	, dwRecvWndSize		(recv_wnd_size)
 	, dwMinRto			(min_rto)
 	, dwMtu				(mtu)
+	, dwFastLimit		(fast_limit)
 	, dwMaxMessageSize	(max_msg_size)
 	, dwHandShakeTimeout(hand_shake_timeout)
 	{
@@ -174,6 +178,7 @@ public:
 				((int)dwSendWndSize > 0)																				&&
 				((int)dwRecvWndSize > 0)																				&&
 				((int)dwMinRto > 0)																						&&
+				((int)dwFastLimit >= 0)																					&&
 				((int)dwHandShakeTimeout > 2 * (int)dwMinRto)															&&
 				((int)dwMtu >= 3 * KCP_HEADER_SIZE && dwMtu <= MAXIMUM_UDP_MAX_DATAGRAM_SIZE)							&&
 				((int)dwMaxMessageSize > 0 && dwMaxMessageSize < ((KCP_MIN_RECV_WND - 1) * (dwMtu - KCP_HEADER_SIZE)))	;
@@ -210,7 +215,8 @@ public:
 			return FALSE;
 
 		{
-			CCriSecLock locallock(m_cs);
+			CCriSecLock recvlock(m_csRecv);
+			CCriSecLock sendlock(m_csSend);
 
 			if(!IsValid())
 				return FALSE;
@@ -254,7 +260,7 @@ public:
 		unique_ptr<BYTE[]> bufCmdPtr;
 
 		{
-			CCriSecLock locallock(m_cs);
+			CCriSecLock recvlock(m_csRecv);
 
 			if(!IsValid())
 			{
@@ -291,20 +297,25 @@ public:
 		}
 
 		{
-			CCriSecTryLock locallock(m_cs);
+			CCriSecTryLock recvlock(m_csRecv);
 
-			if(locallock.IsValid())
+			if(recvlock.IsValid())
 			{
-				if(!IsReady())
-				{
-					::SetLastError(ERROR_INVALID_STATE);
-					return FALSE;
-				}
+				CCriSecTryLock sendlock(m_csSend);
 
-				if(bForce)
-					::ikcp_flush(m_kcp);
-				else
-					::ikcp_update(m_kcp, ::TimeGetTime());
+				if(sendlock.IsValid())
+				{
+					if(!IsReady())
+					{
+						::SetLastError(ERROR_INVALID_STATE);
+						return FALSE;
+					}
+
+					if(bForce)
+						::ikcp_flush(m_kcp);
+					else
+						::ikcp_update(m_kcp, ::TimeGetTime());
+				}
 			}
 		}
 
@@ -319,7 +330,7 @@ public:
 		int rs = NO_ERROR;
 
 		{
-			CCriSecLock locallock(m_cs);
+			CCriSecLock sendlock(m_csSend);
 
 			if(!IsReady())
 				return ERROR_INVALID_STATE;
@@ -342,7 +353,7 @@ public:
 			return -1;
 		}
 
-		CCriSecLock locallock(m_cs);
+		CCriSecLock sendlock(m_csSend);
 
 		if(!IsValid())
 		{
@@ -378,7 +389,7 @@ public:
 		}
 
 		{
-			CCriSecLock locallock(m_cs);
+			CCriSecLock recvlock(m_csRecv);
 
 			if(!IsValid())
 			{
@@ -449,7 +460,7 @@ public:
 		if(!IsReady()) return HR_IGNORE;
 
 		{
-			CCriSecLock locallock(m_cs);
+			CCriSecLock recvlock(m_csRecv);
 
 			if(!IsReady())
 			{
@@ -512,6 +523,7 @@ private:
 		::ikcp_setmtu(m_kcp, attr.dwMtu);
 
 		m_kcp->rx_minrto	= (int)attr.dwMinRto;
+		m_kcp->fastlimit	= (int)attr.dwFastLimit;
 		m_kcp->output		= m_pContext->GetArqOutputProc();
 	}
 
@@ -528,7 +540,6 @@ public:
 	BOOL		IsValid()		const	{return GetStatus() != ARQ_HSS_INIT;}
 	BOOL		IsHandShaking()	const	{return GetStatus() == ARQ_HSS_PROC;}
 	BOOL		IsReady()		const	{return GetStatus() == ARQ_HSS_SUCC;}
-	CCriSec&	GetLock()				{return m_cs;}
 	IKCPCB*		GetKcp()				{return m_kcp;}
 	DWORD		GetConvID()		const	{if(!IsValid()) return 0; return m_kcp->conv;}
 	DWORD		GetSelfConvID()	const	{return m_dwSelfConvID;}
@@ -580,7 +591,8 @@ private:
 	DWORD	m_dwPeerConvID;
 	EnArqHandShakeStatus m_enStatus;
 
-	CCriSec m_cs;
+	CCriSec m_csRecv;
+	CCriSec m_csSend;
 	IKCPCB* m_kcp;
 };
 

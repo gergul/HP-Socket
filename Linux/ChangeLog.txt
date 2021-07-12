@@ -1,4 +1,106 @@
 ﻿==========================================================================================
+v5.8.3 Update:
+==========================================================================================
+
+> Major Upadate
+-----------------
+1. Bug fix: Deadlock may occur when ARQ UDP components send data.
+2. HP socket for NDK compilation script does not introduce mimalloc by default.
+
+> Third-party library Upadate
+-----------------
+1. mimalloc upgrade to version 1.7.1.
+2. llhttp upgrade to version 6.0.2.
+3. openssl upgrade to version 1.1.1k.
+
+==========================================================================================
+v5.8.2 Update:
+==========================================================================================
+
+> Major Upadate
+-----------------
+1. Bug fix: some HP-Socket components raises segment fault in ARM32 platform.
+2. Bug fix: UDP Client component raises segment fault in some special scenarios.
+
+> Third-party library Upadate
+-----------------
+1. mimalloc upgrade to version 1.7.0.
+2. llhttp upgrade to version 4.0.0.
+3. openssl upgrade to version 1.1.1j.
+
+==========================================================================================
+v5.8.1 Update:
+==========================================================================================
+
+> Third-party library Upadate
+-----------------
+1. HTTP parser: llhttp replaces http_ parser.
+2. Memory allocator: mimalloc replaces jemalloc.
+3. openssl upgrade to version 1.1.1i.
+
+> Other Upadate
+-----------------
+1. Move library header files to include/hpsocket directory.
+
+==========================================================================================
+v5.7.3 Update:
+==========================================================================================
+
+> Regular Upadate
+-----------------
+1. Add Brotli compression/decompression support, and provide _BROTLI_DISABLED recompiled macro to disable Brotli functions).
+2. openssl upgrade to version 1.1.1h.
+
+==========================================================================================
+v5.7.2 Update:
+==========================================================================================
+
+> Regular Upadate
+-----------------
+1. Code optimization to improve stability.
+2. openssl upgrade to version 1.1.1g.
+3. http-parser upgrade to version 2.9.4.
+4. kcp upgrade to version 1.6.
+
+==========================================================================================
+v5.7.1 Update:
+==========================================================================================
+
+> UDP Update
+-----------------
+1. Add new component: UDP Nod:
+	1) UDP Node has no concept of "connection", and can send and receive data with any address.
+	2) UDP Node supports three execution modes: unicast, multicast, and broadcast.
+	3) Add UDP Node component demo 'hp-testecho-udp-node'.
+
+> Other Update
+-----------------
+1. Added 'Wait()' method for all components to wait for components to close.
+2. Added 'SetReuseAddressPolicy()' method for all communication components to support setting address reuse policy.
+3. Added 'SetSSLCipherList()' method for all SSL communication components to support setting SSL cipher suites.
+4. Extensive API updates, code refactoring and optimization.
+
+> Update instructions
+-----------------
+1. HP-Socket v5.7.1 has changed or deleted some old APIs, please refer to 'Chang-APIs.txt' when upgrading.
+
+==========================================================================================
+v5.6.4 Update:
+==========================================================================================
+
+> Regular Upadate
+-----------------
+1. Fix crash of HTTP component due to jemalloc bug.
+
+==========================================================================================
+v5.6.3 Update:
+==========================================================================================
+
+> Regular Upadate
+-----------------
+1. Code optimization to improve stability.
+
+==========================================================================================
 v5.6.2 Update:
 ==========================================================================================
 

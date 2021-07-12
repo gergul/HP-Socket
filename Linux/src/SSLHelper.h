@@ -2,11 +2,11 @@
  * Copyright: JessMA Open Source (ldcsaa@gmail.com)
  *
  * Author	: Bruce Liang
- * Website	: http://www.jessma.org
- * Project	: https://github.com/ldcsaa
+ * Website	: https://github.com/ldcsaa
+ * Project	: https://github.com/ldcsaa/HP-Socket
  * Blog		: http://www.cnblogs.com/ldcsaa
  * Wiki		: http://www.oschina.net/p/hp-socket
- * QQ Group	: 75375912, 44636872
+ * QQ Group	: 44636872, 75375912
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@
 
 #pragma once
 
-#include "HPTypeDef.h"
+#include "../include/hpsocket/HPTypeDef.h"
 #include "common/BufferPool.h"
 
 #ifdef _SSL_SUPPORT
@@ -33,27 +33,33 @@
 #define OPENSSL_VERSION_1_0_2	0x10002000L
 #define OPENSSL_VERSION_1_1_0	0x10100000L
 
+#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_1_1_0
+	#define DEFAULT_CIPHER_LIST	_T("DEFAULT:!aNULL:!eNULL:!SSLv2")
+#else
+	#define DEFAULT_CIPHER_LIST	_T("DEFAULT:!aNULL:!eNULL:!SSLv2:!SSLv3")
+#endif
+
  /************************************************************************
- Ãû³Æ£ºSSL È«¾Ö³£Á¿
- ÃèÊö£ºÉùÃ÷ SSL ×é¼þµÄ¹«¹²È«¾Ö³£Á¿
+ åç§°ï¼šSSL å…¨å±€å¸¸é‡
+ æè¿°ï¼šå£°æ˜Ž SSL ç»„ä»¶çš„å…¬å…±å…¨å±€å¸¸é‡
  ************************************************************************/
 
 #define SSL_DOMAIN_SEP_CHAR		'.'
 
  /************************************************************************
-Ãû³Æ£ºSSL ÎÕÊÖ×´Ì¬
-ÃèÊö£º±êÊ¶µ±Ç°Á¬½ÓµÄ SSL ÎÕÊÖ×´Ì¬
+åç§°ï¼šSSL æ¡æ‰‹çŠ¶æ€
+æè¿°ï¼šæ ‡è¯†å½“å‰è¿žæŽ¥çš„ SSL æ¡æ‰‹çŠ¶æ€
 ************************************************************************/
 enum EnSSLHandShakeStatus
 {
-	SSL_HSS_INIT	= 0,	// ³õÊ¼×´Ì¬
-	SSL_HSS_PROC	= 1,	// ÕýÔÚÎÕÊÖ
-	SSL_HSS_SUCC	= 2,	// ÎÕÊÖ³É¹¦
+	SSL_HSS_INIT	= 0,	// åˆå§‹çŠ¶æ€
+	SSL_HSS_PROC	= 1,	// æ­£åœ¨æ¡æ‰‹
+	SSL_HSS_SUCC	= 2,	// æ¡æ‰‹æˆåŠŸ
 };
 
 #if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_1_1_0
 
-/* SSL CRYPTO DYNLOCK ½á¹¹ */
+/* SSL CRYPTO DYNLOCK ç»“æž„ */
 typedef struct CRYPTO_dynlock_value
 {
 	CSimpleRWLock cs;
@@ -93,8 +99,8 @@ private:
 };
 
 /************************************************************************
-Ãû³Æ£ºSSL Context
-ÃèÊö£º³õÊ¼»¯ºÍÇåÀí SSL ÔËÐÐ»·¾³
+åç§°ï¼šSSL Context
+æè¿°ï¼šåˆå§‹åŒ–å’Œæ¸…ç† SSL è¿è¡ŒçŽ¯å¢ƒ
 ************************************************************************/
 class CSSLContext
 {
@@ -103,88 +109,94 @@ class CSSLContext
 public:
 
 	/*
-	* Ãû³Æ£º³õÊ¼»¯ SSL »·¾³²ÎÊý
-	* ÃèÊö£ºSSL »·¾³²ÎÊý±ØÐëÔÚ SSL Í¨ÐÅ×é¼þÆô¶¯Ç°Íê³É³õÊ¼»¯£¬·ñÔòÆô¶¯Ê§°Ü
+	* åç§°ï¼šåˆå§‹åŒ– SSL çŽ¯å¢ƒå‚æ•°
+	* æè¿°ï¼šSSL çŽ¯å¢ƒå‚æ•°å¿…é¡»åœ¨ SSL é€šä¿¡ç»„ä»¶å¯åŠ¨å‰å®Œæˆåˆå§‹åŒ–ï¼Œå¦åˆ™å¯åŠ¨å¤±è´¥
 	*		
-	* ²ÎÊý£º		enSessionMode			-- SSL ¹¤×÷Ä£Ê½£¨²Î¿¼ EnSSLSessionMode£©
-	*			iVerifyMode				-- SSL ÑéÖ¤Ä£Ê½£¨²Î¿¼ EnSSLVerifyMode£©
-	*			lpPemCert				-- Ö¤ÊéÎÄ¼þ£¨¿Í»§¶Ë¿ÉÑ¡£©
-	*			lpPemKey				-- Ë½Ô¿ÎÄ¼þ£¨¿Í»§¶Ë¿ÉÑ¡£©
-	*			lpKeyPasswod			-- Ë½Ô¿ÃÜÂë£¨Ã»ÓÐÃÜÂëÔòÎª¿Õ£©
-	*			lpCAPemCert				-- CA Ö¤ÊéÎÄ¼þ»òÄ¿Â¼£¨µ¥ÏòÑéÖ¤»ò¿Í»§¶Ë¿ÉÑ¡£©
-	*			fnServerNameCallback	-- SNI »Øµ÷º¯ÊýÖ¸Õë£¨¿ÉÑ¡£¬Ö»ÓÃÓÚ·þÎñ¶Ë£¬Èç¹ûÎª nullptr ÔòÊ¹ÓÃ SNI Ä¬ÈÏ»Øµ÷º¯Êý£©
+	* å‚æ•°ï¼š		enSessionMode			-- SSL å·¥ä½œæ¨¡å¼ï¼ˆå‚è€ƒ EnSSLSessionModeï¼‰
+	*			iVerifyMode				-- SSL éªŒè¯æ¨¡å¼ï¼ˆå‚è€ƒ EnSSLVerifyModeï¼‰
+	*			lpPemCert				-- è¯ä¹¦æ–‡ä»¶ï¼ˆå®¢æˆ·ç«¯å¯é€‰ï¼‰
+	*			lpPemKey				-- ç§é’¥æ–‡ä»¶ï¼ˆå®¢æˆ·ç«¯å¯é€‰ï¼‰
+	*			lpKeyPasswod			-- ç§é’¥å¯†ç ï¼ˆæ²¡æœ‰å¯†ç åˆ™ä¸ºç©ºï¼‰
+	*			lpCAPemCert				-- CA è¯ä¹¦æ–‡ä»¶æˆ–ç›®å½•ï¼ˆå•å‘éªŒè¯æˆ–å®¢æˆ·ç«¯å¯é€‰ï¼‰
+	*			fnServerNameCallback	-- SNI å›žè°ƒå‡½æ•°æŒ‡é’ˆï¼ˆå¯é€‰ï¼Œåªç”¨äºŽæœåŠ¡ç«¯ï¼Œå¦‚æžœä¸º nullptr åˆ™ä½¿ç”¨ SNI é»˜è®¤å›žè°ƒå‡½æ•°ï¼‰
 	*
-	* ·µ»ØÖµ£º	TRUE	-- ³É¹¦
-	*			FALSE	-- Ê§°Ü£¬¿ÉÍ¨¹ý ::GetLastError() »ñÈ¡Ê§°ÜÔ­Òò
+	* è¿”å›žå€¼ï¼š	TRUE	-- æˆåŠŸ
+	*			FALSE	-- å¤±è´¥ï¼Œå¯é€šè¿‡ ::GetLastError() èŽ·å–å¤±è´¥åŽŸå› 
 	*/
 	BOOL Initialize(EnSSLSessionMode enSessionMode, int iVerifyMode = SSL_VM_NONE, BOOL bMemory = FALSE, LPVOID lpPemCert = nullptr, LPVOID lpPemKey = nullptr, LPVOID lpKeyPasswod = nullptr, LPVOID lpCAPemCert = nullptr, Fn_SNI_ServerNameCallback fnServerNameCallback = nullptr);
 
 	/*
-	* Ãû³Æ£ºÔö¼Ó SNI Ö÷»úÖ¤Êé£¨Ö»ÓÃÓÚ·þÎñ¶Ë£©
-	* ÃèÊö£ºSSL ·þÎñ¶ËÔÚ Initialize() ³É¹¦ºó¿ÉÒÔµ÷ÓÃ±¾·½·¨Ôö¼Ó¶à¸ö SNI Ö÷»úÖ¤Êé
+	* åç§°ï¼šå¢žåŠ  SNI ä¸»æœºè¯ä¹¦ï¼ˆåªç”¨äºŽæœåŠ¡ç«¯ï¼‰
+	* æè¿°ï¼šSSL æœåŠ¡ç«¯åœ¨ Initialize() æˆåŠŸåŽå¯ä»¥è°ƒç”¨æœ¬æ–¹æ³•å¢žåŠ å¤šä¸ª SNI ä¸»æœºè¯ä¹¦
 	*		
-	* ²ÎÊý£º		iVerifyMode				-- SSL ÑéÖ¤Ä£Ê½£¨²Î¿¼ EnSSLVerifyMode£©
-	*			lpPemCert				-- Ö¤ÊéÎÄ¼þ
-	*			lpPemKey				-- Ë½Ô¿ÎÄ¼þ
-	*			lpKeyPasswod			-- Ë½Ô¿ÃÜÂë£¨Ã»ÓÐÃÜÂëÔòÎª¿Õ£©
-	*			lpCAPemCert				-- CA Ö¤ÊéÎÄ¼þ»òÄ¿Â¼£¨µ¥ÏòÑéÖ¤¿ÉÑ¡£©
+	* å‚æ•°ï¼š		iVerifyMode				-- SSL éªŒè¯æ¨¡å¼ï¼ˆå‚è€ƒ EnSSLVerifyModeï¼‰
+	*			lpPemCert				-- è¯ä¹¦æ–‡ä»¶
+	*			lpPemKey				-- ç§é’¥æ–‡ä»¶
+	*			lpKeyPasswod			-- ç§é’¥å¯†ç ï¼ˆæ²¡æœ‰å¯†ç åˆ™ä¸ºç©ºï¼‰
+	*			lpCAPemCert				-- CA è¯ä¹¦æ–‡ä»¶æˆ–ç›®å½•ï¼ˆå•å‘éªŒè¯å¯é€‰ï¼‰
 	*
-	* ·µ»ØÖµ£º	ÕýÊý		-- ³É¹¦£¬²¢·µ»Ø SNI Ö÷»úÖ¤Êé¶ÔÓ¦µÄË÷Òý£¬¸ÃË÷ÒýÓÃÓÚÔÚ SNI »Øµ÷º¯ÊýÖÐ¶¨Î» SNI Ö÷»ú
-	*			¸ºÊý		-- Ê§°Ü£¬¿ÉÍ¨¹ý ::GetLastError() »ñÈ¡Ê§°ÜÔ­Òò
+	* è¿”å›žå€¼ï¼š	æ­£æ•°		-- æˆåŠŸï¼Œå¹¶è¿”å›ž SNI ä¸»æœºè¯ä¹¦å¯¹åº”çš„ç´¢å¼•ï¼Œè¯¥ç´¢å¼•ç”¨äºŽåœ¨ SNI å›žè°ƒå‡½æ•°ä¸­å®šä½ SNI ä¸»æœº
+	*			è´Ÿæ•°		-- å¤±è´¥ï¼Œå¯é€šè¿‡ ::GetLastError() èŽ·å–å¤±è´¥åŽŸå› 
 	*/
 	int AddServerContext(int iVerifyMode, BOOL bMemory, LPVOID lpPemCert, LPVOID lpPemKey, LPVOID lpKeyPasswod = nullptr, LPVOID lpCAPemCert = nullptr);
 
 	/*
-	* Ãû³Æ£º°ó¶¨ SNI Ö÷»úÓòÃû
-	* ÃèÊö£ºSSL ·þÎñ¶ËÔÚ AddServerContext() ³É¹¦ºó¿ÉÒÔµ÷ÓÃ±¾·½·¨°ó¶¨Ö÷»úÓòÃûµ½ SNI Ö÷»úÖ¤Êé
+	* åç§°ï¼šç»‘å®š SNI ä¸»æœºåŸŸå
+	* æè¿°ï¼šSSL æœåŠ¡ç«¯åœ¨ AddServerContext() æˆåŠŸåŽå¯ä»¥è°ƒç”¨æœ¬æ–¹æ³•ç»‘å®šä¸»æœºåŸŸååˆ° SNI ä¸»æœºè¯ä¹¦
 	*		
-	* ²ÎÊý£º		lpszServerName		-- Ö÷»úÓòÃû
-	*			iContextIndex		-- SNI Ö÷»úÖ¤Êé¶ÔÓ¦µÄË÷Òý
+	* å‚æ•°ï¼š		lpszServerName		-- ä¸»æœºåŸŸå
+	*			iContextIndex		-- SNI ä¸»æœºè¯ä¹¦å¯¹åº”çš„ç´¢å¼•
 	*
-	* ·µ»ØÖµ£º	TRUE	-- ³É¹¦
-	*			FALSE	-- Ê§°Ü£¬¿ÉÍ¨¹ý ::GetLastError() »ñÈ¡Ê§°ÜÔ­Òò
+	* è¿”å›žå€¼ï¼š	TRUE	-- æˆåŠŸ
+	*			FALSE	-- å¤±è´¥ï¼Œå¯é€šè¿‡ ::GetLastError() èŽ·å–å¤±è´¥åŽŸå› 
 	*/
 	virtual BOOL BindServerName(LPCTSTR lpszServerName, int iContextIndex);
 
 	/*
-	* Ãû³Æ£ºÇåÀí SSL ÔËÐÐ»·¾³
-	* ÃèÊö£ºÇåÀí SSL ÔËÐÐ»·¾³£¬»ØÊÕ SSL Ïà¹ØÄÚ´æ
-	*		1¡¢CSSLContext µÄÎö¹¹º¯Êý»á×Ô¶¯µ÷ÓÃ±¾·½·¨
-	*		2¡¢µ±ÒªÖØÐÂÉèÖÃ SSL »·¾³²ÎÊýÊ±£¬ÐèÒªÏÈµ÷ÓÃ±¾·½·¨ÇåÀíÔ­ÏÈµÄ»·¾³²ÎÊý
+	* åç§°ï¼šæ¸…ç† SSL è¿è¡ŒçŽ¯å¢ƒ
+	* æè¿°ï¼šæ¸…ç† SSL è¿è¡ŒçŽ¯å¢ƒï¼Œå›žæ”¶ SSL ç›¸å…³å†…å­˜
+	*		1ã€CSSLContext çš„æžæž„å‡½æ•°ä¼šè‡ªåŠ¨è°ƒç”¨æœ¬æ–¹æ³•
+	*		2ã€å½“è¦é‡æ–°è®¾ç½® SSL çŽ¯å¢ƒå‚æ•°æ—¶ï¼Œéœ€è¦å…ˆè°ƒç”¨æœ¬æ–¹æ³•æ¸…ç†åŽŸå…ˆçš„çŽ¯å¢ƒå‚æ•°
 	*		
-	* ²ÎÊý£º	ÎÞ
+	* å‚æ•°ï¼š	æ— 
 	* 
-	* ·µ»ØÖµ£ºÎÞ
+	* è¿”å›žå€¼ï¼šæ— 
 	*/
 	void Cleanup();
 
-	/* »ñÈ¡ SSL ÔËÐÐ»·¾³ SSL_CTX ¶ÔÏó */
+	/* èŽ·å– SSL è¿è¡ŒçŽ¯å¢ƒ SSL_CTX å¯¹è±¡ */
 	SSL_CTX* GetContext				(int i) const;
-	/* »ñÈ¡ SSL ÔËÐÐ»·¾³Ä¬ÈÏ SSL_CTX ¶ÔÏó */
+	/* èŽ·å– SSL è¿è¡ŒçŽ¯å¢ƒé»˜è®¤ SSL_CTX å¯¹è±¡ */
 	SSL_CTX* GetDefaultContext		()		const	{return m_sslCtx;}
-	/* »ñÈ¡ SSL ÔËÐÐ»·¾³µÄÅäÖÃÄ£Ê½£¬ÅäÖÃÄ£Ê½²Î¿¼£ºEnSSLSessionMode */
+	/* èŽ·å– SSL è¿è¡ŒçŽ¯å¢ƒçš„é…ç½®æ¨¡å¼ï¼Œé…ç½®æ¨¡å¼å‚è€ƒï¼šEnSSLSessionMode */
 	EnSSLSessionMode GetSessionMode	()		const	{return m_enSessionMode;}
-	/* ¼ì²é SSL ÔËÐÐ»·¾³ÊÇ·ñ³õÊ¼»¯Íê³É */
+	/* æ£€æŸ¥ SSL è¿è¡ŒçŽ¯å¢ƒæ˜¯å¦åˆå§‹åŒ–å®Œæˆ */
 	BOOL IsValid					()		const	{return m_sslCtx != nullptr;}
+
+	/* è®¾ç½® SSL åŠ å¯†ç®—æ³•åˆ—è¡¨ */
+	void SetCipherList(LPCTSTR lpszCipherList)		{m_strCipherList = lpszCipherList;}
+	/* èŽ·å– SSL åŠ å¯†ç®—æ³•åˆ—è¡¨ */
+	LPCTSTR GetCipherList()							{return m_strCipherList;}
 
 public:
 	
 	/*
-	* Ãû³Æ£ºÇåÀíÏß³Ì¾Ö²¿»·¾³ SSL ×ÊÔ´
-	* ÃèÊö£ºÈÎºÎÒ»¸ö²Ù×÷ SSL µÄÏß³Ì£¬ÔÚÍ¨ÐÅ½áÊøÊ±¶¼ÐèÒªÇåÀíÏß³Ì¾Ö²¿»·¾³ SSL ×ÊÔ´
-	*		1¡¢Ö÷Ïß³ÌºÍ HP-Socket ¹¤×÷Ïß³ÌÔÚÍ¨ÐÅ½áÊøÊ±»á×Ô¶¯ÇåÀíÏß³Ì¾Ö²¿»·¾³ SSL ×ÊÔ´¡£Òò´Ë£¬Ò»°ãÇé¿öÏÂ²»±ØÊÖ¹¤µ÷ÓÃ±¾·½·¨
-	*		2¡¢ÌØÊâÇé¿öÏÂ£¬µ±×Ô¶¨ÒåÏß³Ì²ÎÓë HP-Socket Í¨ÐÅ²Ù×÷²¢¼ì²éµ½ SSL ÄÚ´æÐ¹Â©Ê±£¬ÐèÔÚÃ¿´ÎÍ¨ÐÅ½áÊøÊ±×Ô¶¨ÒåÏß³Ìµ÷ÓÃ±¾·½·¨
+	* åç§°ï¼šæ¸…ç†çº¿ç¨‹å±€éƒ¨çŽ¯å¢ƒ SSL èµ„æº
+	* æè¿°ï¼šä»»ä½•ä¸€ä¸ªæ“ä½œ SSL çš„çº¿ç¨‹ï¼Œåœ¨é€šä¿¡ç»“æŸæ—¶éƒ½éœ€è¦æ¸…ç†çº¿ç¨‹å±€éƒ¨çŽ¯å¢ƒ SSL èµ„æº
+	*		1ã€ä¸»çº¿ç¨‹å’Œ HP-Socket å·¥ä½œçº¿ç¨‹åœ¨é€šä¿¡ç»“æŸæ—¶ä¼šè‡ªåŠ¨æ¸…ç†çº¿ç¨‹å±€éƒ¨çŽ¯å¢ƒ SSL èµ„æºã€‚å› æ­¤ï¼Œä¸€èˆ¬æƒ…å†µä¸‹ä¸å¿…æ‰‹å·¥è°ƒç”¨æœ¬æ–¹æ³•
+	*		2ã€ç‰¹æ®Šæƒ…å†µä¸‹ï¼Œå½“è‡ªå®šä¹‰çº¿ç¨‹å‚ä¸Ž HP-Socket é€šä¿¡æ“ä½œå¹¶æ£€æŸ¥åˆ° SSL å†…å­˜æ³„æ¼æ—¶ï¼Œéœ€åœ¨æ¯æ¬¡é€šä¿¡ç»“æŸæ—¶è‡ªå®šä¹‰çº¿ç¨‹è°ƒç”¨æœ¬æ–¹æ³•
 	*		
-	* ²ÎÊý£º		dwThreadID	-- Ïß³Ì ID£¨0£ºµ±Ç°Ïß³Ì£©
+	* å‚æ•°ï¼š		dwThreadID	-- çº¿ç¨‹ IDï¼ˆ0ï¼šå½“å‰çº¿ç¨‹ï¼‰
 	* 
-	* ·µ»ØÖµ£ºÎÞ
+	* è¿”å›žå€¼ï¼šæ— 
 	*/
 	static void RemoveThreadLocalState(THR_ID dwThreadID = 0)	{CSSLInitializer::CleanupThreadState(dwThreadID);}
 
 public:
 
 	CSSLContext()
-	: m_enSessionMode		(SSL_SM_SERVER)
+	: m_strCipherList		(DEFAULT_CIPHER_LIST)
+	, m_enSessionMode		(SSL_SM_SERVER)
 	, m_sslCtx				(nullptr)
 	, m_fnServerNameCallback(nullptr)
 	{
@@ -214,18 +226,19 @@ private:
 public:
 
 	/*
-	* Ãû³Æ£ºSNI Ä¬ÈÏ»Øµ÷º¯Êý
-	* ÃèÊö£ºInitialize ·½·¨ÖÐÈç¹û²»Ö¸¶¨ SNI »Øµ÷º¯ÊýÔòÊ¹ÓÃ´Ë SNI Ä¬ÈÏ»Øµ÷º¯Êý
+	* åç§°ï¼šSNI é»˜è®¤å›žè°ƒå‡½æ•°
+	* æè¿°ï¼šInitialize æ–¹æ³•ä¸­å¦‚æžœä¸æŒ‡å®š SNI å›žè°ƒå‡½æ•°åˆ™ä½¿ç”¨æ­¤ SNI é»˜è®¤å›žè°ƒå‡½æ•°
 	*		
-	* ²ÎÊý£º		lpszServerName	-- ÇëÇóÓòÃû
-	*			pContext		-- SSL Context ¶ÔÏó
+	* å‚æ•°ï¼š		lpszServerName	-- è¯·æ±‚åŸŸå
+	*			pContext		-- SSL Context å¯¹è±¡
 	* 
-	* ·µ»ØÖµ£ºSNI Ö÷»úÖ¤Êé¶ÔÓ¦µÄË÷Òý
+	* è¿”å›žå€¼ï¼šSNI ä¸»æœºè¯ä¹¦å¯¹åº”çš„ç´¢å¼•
 	*/
 	static int __HP_CALL DefaultServerNameCallback(LPCTSTR lpszServerName, PVOID pContext);
 
 private:
 
+	CString				m_strCipherList;
 	EnSSLSessionMode	m_enSessionMode;
 	CServerNameMap		m_sslServerNames;
 	vector<SSL_CTX*>	m_lsSslCtxs;

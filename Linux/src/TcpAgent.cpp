@@ -2,11 +2,11 @@
  * Copyright: JessMA Open Source (ldcsaa@gmail.com)
  *
  * Author	: Bruce Liang
- * Website	: http://www.jessma.org
- * Project	: https://github.com/ldcsaa
+ * Website	: https://github.com/ldcsaa
+ * Project	: https://github.com/ldcsaa/HP-Socket
  * Blog		: http://www.cnblogs.com/ldcsaa
  * Wiki		: http://www.oschina.net/p/hp-socket
- * QQ Group	: 75375912, 44636872
+ * QQ Group	: 44636872, 75375912
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -110,9 +110,6 @@ BOOL CTcpAgent::CheckStoping()
 			m_enState = SS_STOPPING;
 			return TRUE;
 		}
-
-		while(m_enState != SS_STOPPED)
-			::WaitFor(10);
 	}
 
 	SetLastError(SE_ILLEGAL_STATE, __FUNCTION__, ERROR_INVALID_STATE);
@@ -230,6 +227,8 @@ void CTcpAgent::Reset()
 	::ClearPtrMap(m_rcBufferMap);
 
 	m_enState = SS_STOPPED;
+
+	m_evWait.SyncNotifyAll();
 }
 
 BOOL CTcpAgent::Connect(LPCTSTR lpszRemoteAddress, USHORT usPort, CONNID* pdwConnID, PVOID pExtra, USHORT usLocalPort, LPCTSTR lpszLocalAddress)
@@ -304,7 +303,7 @@ int CTcpAgent::CreateClientSocket(LPCTSTR lpszRemoteAddress, USHORT usPort, LPCT
 	{
 		BOOL bOnOff	= (m_dwKeepAliveTime > 0 && m_dwKeepAliveInterval > 0);
 		VERIFY(IS_NO_ERROR(::SSO_KeepAliveVals(soClient, bOnOff, m_dwKeepAliveTime, m_dwKeepAliveInterval)));
-		VERIFY(IS_NO_ERROR(::SSO_ReuseAddress(soClient, m_bReuseAddress)));
+		VERIFY(IS_NO_ERROR(::SSO_ReuseAddress(soClient, m_enReusePolicy)));
 
 		if(bBind && usLocalPort == 0)
 		{
@@ -456,6 +455,7 @@ void CTcpAgent::AddClientSocketObj(CONNID dwConnID, TAgentSocketObj* pSocketObj,
 	pSocketObj->host		= lpszRemoteAddress;
 	pSocketObj->extra		= pExtra;
 
+	pSocketObj->SetConnected(CST_CONNECTING);
 	remoteAddr.Copy(pSocketObj->remoteAddr);
 
 	VERIFY(m_bfActiveSockets.ReleaseLock(dwConnID, pSocketObj));
@@ -839,7 +839,7 @@ BOOL CTcpAgent::OnBeforeProcessIo(PVOID pv, UINT events)
 		return FALSE;
 	}
 
-	if(!pSocketObj->HasConnected())
+	if(pSocketObj->IsConnecting())
 	{
 		HandleConnect(pSocketObj, events);
 
@@ -971,13 +971,11 @@ BOOL CTcpAgent::HandleConnect(TAgentSocketObj* pSocketObj, UINT events)
 		return FALSE;
 	}
 
-	if(events & _EPOLL_HUNGUP_EVENTS)
+	if((events & (_EPOLL_HUNGUP_EVENTS | _EPOLL_READ_EVENTS)) || !(events & EPOLLOUT))
 	{
 		AddFreeSocketObj(pSocketObj, SCF_CLOSE, SO_CONNECT, SE_OK);
 		return FALSE;
 	}
-
-	ASSERT(events & EPOLLOUT);
 
 	pSocketObj->SetConnected();
 
@@ -1049,41 +1047,42 @@ BOOL CTcpAgent::HandleSend(TAgentSocketObj* pSocketObj, int flag)
 	if(!pSocketObj->IsPending())
 		return TRUE;
 
-	CReentrantCriSecLock locallock(pSocketObj->csSend);
+	BOOL bBlocked	= FALSE;
+	int writes		= flag ? -1 : MAX_CONTINUE_WRITES;
 
-	if(!pSocketObj->IsPending())
-		return TRUE;
-
-	BOOL isOK = TRUE;
-
-	int writes = flag ? -1 : MAX_CONTINUE_WRITES;
 	TBufferObjList& sndBuff = pSocketObj->sndBuff;
+	TItemPtr itPtr(sndBuff);
 
 	for(int i = 0; i < writes || writes < 0; i++)
 	{
-		TItemPtr itPtr(sndBuff, sndBuff.PopFront());
+		{
+			CReentrantCriSecLock locallock(pSocketObj->csSend);
+			itPtr = sndBuff.PopFront();
+		}
 
 		if(!itPtr.IsValid())
 			break;
 
 		ASSERT(!itPtr->IsEmpty());
 
-		isOK = SendItem(pSocketObj, itPtr);
+		if(!SendItem(pSocketObj, itPtr, bBlocked))
+			return FALSE;
 
-		if(!isOK)
-			break;
-
-		if(!itPtr->IsEmpty())
+		if(bBlocked)
 		{
+			ASSERT(!itPtr->IsEmpty());
+
+			CReentrantCriSecLock locallock(pSocketObj->csSend);
 			sndBuff.PushFront(itPtr.Detach());
+
 			break;
 		}
 	}
 
-	return isOK;
+	return TRUE;
 }
 
-BOOL CTcpAgent::SendItem(TAgentSocketObj* pSocketObj, TItem* pItem)
+BOOL CTcpAgent::SendItem(TAgentSocketObj* pSocketObj, TItem* pItem, BOOL& bBlocked)
 {
 	while(!pItem->IsEmpty())
 	{
@@ -1104,10 +1103,15 @@ BOOL CTcpAgent::SendItem(TAgentSocketObj* pSocketObj, TItem* pItem)
 			int code = ::WSAGetLastError();
 
 			if(code == ERROR_WOULDBLOCK)
+			{
+				bBlocked = TRUE;
 				break;
-
-			AddFreeSocketObj(pSocketObj, SCF_ERROR, SO_SEND, code);
-			return FALSE;
+			}
+			else
+			{
+				AddFreeSocketObj(pSocketObj, SCF_ERROR, SO_SEND, code);
+				return FALSE;
+			}
 		}
 		else
 			ASSERT(FALSE);

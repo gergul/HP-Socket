@@ -1,12 +1,12 @@
-﻿/*
+/*
 * Copyright: JessMA Open Source (ldcsaa@gmail.com)
 *
 * Author	: Bruce Liang
-* Website	: http://www.jessma.org
-* Project	: https://github.com/ldcsaa
+* Website	: https://github.com/ldcsaa
+* Project	: https://github.com/ldcsaa/HP-Socket
 * Blog		: http://www.cnblogs.com/ldcsaa
 * Wiki		: http://www.oschina.net/p/hp-socket
-* QQ Group	: 75375912, 44636872
+* QQ Group	: 44636872, 75375912
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@
 
 #pragma once
 
-#include "GlobalDef.h"
+#include "../../include/hpsocket/GlobalDef.h"
 #include "Singleton.h"
 #include "STLHelper.h"
 #include "FuncHelper.h"
@@ -34,7 +34,7 @@ using namespace std;
 #define CACHE_LINE		64
 #define PACK_SIZE_OF(T)	(CACHE_LINE - sizeof(T) % CACHE_LINE)
 
-#if !defined (__x86_64__) && !defined(__arm64__)
+#if __WORDSIZE == 32
 	#pragma pack(push, 4)
 #endif
 
@@ -738,7 +738,7 @@ template <class T, class index_type, bool adjust_index> T* const CRingCache2<T, 
 template <class T, class index_type, bool adjust_index> T* const CRingCache2<T, index_type, adjust_index>::E_MAX_STATUS	= (T*)0x0F;
 
 template <class T, class index_type, bool adjust_index> DWORD const CRingCache2<T, index_type, adjust_index>::MAX_SIZE	= 
-#if !defined(__x86_64__) && !defined(__arm64__)
+#if __WORDSIZE == 32
 																														  0x00FFFFFF
 #else
 																														  0xFFFFFFFF
@@ -1742,6 +1742,6 @@ void ReleaseGCObj(CCASQueue<T>& lsGC, DWORD dwLockTime, BOOL bForce = FALSE)
 	}
 }
 
-#if !defined(__x86_64__) && !defined(__arm64__)
+#if __WORDSIZE == 32
 	#pragma pack(pop)
 #endif

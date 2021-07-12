@@ -1,12 +1,12 @@
-/*
+﻿/*
  * Copyright: JessMA Open Source (ldcsaa@gmail.com)
  *
  * Author	: Bruce Liang
- * Website	: http://www.jessma.org
- * Project	: https://github.com/ldcsaa
+ * Website	: https://github.com/ldcsaa
+ * Project	: https://github.com/ldcsaa/HP-Socket
  * Blog		: http://www.cnblogs.com/ldcsaa
  * Wiki		: http://www.oschina.net/p/hp-socket
- * QQ Group	: 75375912, 44636872
+ * QQ Group	: 44636872, 75375912
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -133,10 +133,14 @@ template<class T, USHORT default_port> EnHandleResult CHttpAgentT<T, default_por
 
 template<class T, USHORT default_port> EnHandleResult CHttpAgentT<T, default_port>::DoFireConnect(TSocketObj* pSocketObj)
 {
+	THttpObj* pHttpObj	  = DoStartHttp(pSocketObj);
 	EnHandleResult result = __super::DoFireConnect(pSocketObj);
 
-	if(result != HR_ERROR)
-		DoStartHttp(pSocketObj);
+	if(result == HR_ERROR)
+	{
+		m_objPool.PutFreeHttpObj(pHttpObj);
+		SetConnectionReserved(pSocketObj, nullptr);
+	}
 
 	return result;
 }
@@ -179,7 +183,10 @@ template<class T, USHORT default_port> EnHandleResult CHttpAgentT<T, default_por
 	EnHandleResult result = __super::DoFireClose(pSocketObj, enOperation, iErrorCode);
 
 	if(pHttpObj != nullptr)
+	{
 		m_objPool.PutFreeHttpObj(pHttpObj);
+		SetConnectionReserved(pSocketObj, nullptr);
+	}
 
 	return result;
 }
@@ -443,10 +450,12 @@ template<class T, USHORT default_port> BOOL CHttpAgentT<T, default_port>::StartH
 	return TRUE;
 }
 
-template<class T, USHORT default_port> void CHttpAgentT<T, default_port>::DoStartHttp(TSocketObj* pSocketObj)
+template<class T, USHORT default_port> typename CHttpAgentT<T, default_port>::THttpObj* CHttpAgentT<T, default_port>::DoStartHttp(TSocketObj* pSocketObj)
 {
 	THttpObj* pHttpObj = m_objPool.PickFreeHttpObj(this, pSocketObj);
 	ENSURE(SetConnectionReserved(pSocketObj, pHttpObj));
+
+	return pHttpObj;
 }
 
 // ------------------------------------------------------------------------------------------------------------- //

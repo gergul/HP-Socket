@@ -1,12 +1,12 @@
-﻿/*
+/*
 * Copyright: JessMA Open Source (ldcsaa@gmail.com)
 *
 * Author	: Bruce Liang
-* Website	: http://www.jessma.org
-* Project	: https://github.com/ldcsaa
+* Website	: https://github.com/ldcsaa
+* Project	: https://github.com/ldcsaa/HP-Socket
 * Blog		: http://www.cnblogs.com/ldcsaa
 * Wiki		: http://www.oschina.net/p/hp-socket
-* QQ Group	: 75375912, 44636872
+* QQ Group	: 44636872, 75375912
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -23,8 +23,8 @@
 
 #pragma once
 
-#include "HPTypeDef.h"
-#include "SocketInterface.h"
+#include "../include/hpsocket/HPTypeDef.h"
+#include "../include/hpsocket/SocketInterface.h"
 #include "common/StringT.h"
 #include "common/SysHelper.h"
 #include "common/BufferPtr.h"
@@ -38,15 +38,12 @@
 #include <arpa/inet.h>
 
 #ifdef _ZLIB_SUPPORT
-
-#if defined(ZLIB_CONST) && !defined(z_const)
-	#define z_const const
-#else
-	#define z_const
+#include <zlib.h>
 #endif
 
-#include <zlib.h>
-
+#ifdef _BROTLI_SUPPORT
+#include <brotli/decode.h>
+#include <brotli/encode.h>
 #endif
 
 using ADDRESS_FAMILY	= sa_family_t;
@@ -79,7 +76,7 @@ using SOCKADDR_IN6		= sockaddr_in6;
 #define MAX_CONNECTION_COUNT					(5 * 1000 * 1000)
 /* Server/Agent 默认最大连接数 */
 #define DEFAULT_CONNECTION_COUNT				10000
-/* Server/Agent 默认 Socket 缓存对象锁定时间 */
+/* Server/Agent 默认 Socket 对象缓存锁定时间 */
 #define DEFAULT_FREE_SOCKETOBJ_LOCK_TIME		DEFAULT_OBJECT_CACHE_LOCK_TIME
 /* Server/Agent 默认 Socket 缓存池大小 */
 #define DEFAULT_FREE_SOCKETOBJ_POOL				DEFAULT_OBJECT_CACHE_POOL_SIZE
@@ -140,6 +137,7 @@ using SOCKADDR_IN6		= sockaddr_in6;
 #define IPV6_ADDR_SEPARATOR_CHAR				':'
 #define IPV6_ZONE_INDEX_CHAR					'%'
 
+#define CST_CONNECTING							(-1)
 #define INVALID_SOCKET							INVALID_FD
 #define SOCKET_ERROR							HAS_ERROR
 #define WSASetLastError							SetLastError
@@ -149,6 +147,7 @@ using SOCKADDR_IN6		= sockaddr_in6;
 #define closesocket								close
 
 #define ENSURE_STOP()							{if(GetState() != SS_STOPPED) Stop();}
+#define ENSURE_HAS_STOPPED()					{if(GetState() != SS_STOPPED) return;}
 
 typedef struct hp_addr
 {
@@ -314,10 +313,55 @@ typedef struct hp_sockaddr
 
 } HP_SOCKADDR, *HP_PSOCKADDR;
 
+struct TNodeBufferObj : public TItem
+{
+	using __super = TItem;
+
+	HP_SOCKADDR	remoteAddr;
+
+public:
+	void Reset(int first = 0, int last = 0)
+	{
+		__super::Reset(first, last);
+		remoteAddr.Reset();
+	}
+
+public:
+	static TNodeBufferObj* Construct(CPrivateHeap& heap,
+									int		capacity	= DEFAULT_ITEM_CAPACITY,
+									BYTE*	pData		= nullptr,
+									int		length		= 0)
+	{
+		return ::ConstructItemT((TNodeBufferObj*)(nullptr), heap, capacity, pData, length);
+	}
+
+	static void Destruct(TNodeBufferObj* pBufferObj)
+	{
+		::DestructItemT(pBufferObj);
+	}
+
+	TNodeBufferObj(CPrivateHeap& hp, BYTE* pHead, int cap = DEFAULT_ITEM_CAPACITY, BYTE* pData = nullptr, int length = 0)
+	: TItem(hp, pHead, cap, pData, length)
+	{
+
+	}
+
+	~TNodeBufferObj()
+	{
+	}
+
+	DECLARE_NO_COPY_CLASS(TNodeBufferObj)
+};
+
+typedef CCASQueue<TNodeBufferObj>					CNodeRecvQueue;
+typedef TItemPtrT<TNodeBufferObj>					TNodeBufferObjPtr;
+typedef CNodePoolT<TNodeBufferObj>					CNodeBufferObjPool;
+typedef TItemListExT<TNodeBufferObj, volatile int>	TNodeBufferObjList;
+
 /* Server 组件和 Agent 组件内部使用的事件处理结果常量 */
 
 // 连接已关闭
-#define HR_CLOSED	0xFF
+#define HR_CLOSED		0xFF
 
 /* 命令类型 */
 enum EnDispCmdType
@@ -339,6 +383,8 @@ enum EnSocketCloseFlag
 
 /* 数据缓冲节点 */
 typedef TItem			TBufferObj;
+/* 数据缓冲节点智能指针 */
+typedef TItemPtr		TBufferObjPtr;
 /* 数据缓冲区对象池 */
 typedef CItemPool		CBufferObjPool;
 /* 数据缓冲区链表模板 */
@@ -392,7 +438,8 @@ struct TSocketObjBase
 	DWORD GetActiveTime	()	const	{return activeTime;}
 	BOOL IsPaused		()	const	{return paused;}
 
-	BOOL HasConnected()							{return connected;}
+	BOOL HasConnected()							{return connected == TRUE;}
+	BOOL IsConnecting()							{return connected == CST_CONNECTING;}
 	void SetConnected(BOOL bConnected = TRUE)	{connected = bConnected;}
 
 	void Reset(CONNID dwConnID)
@@ -539,7 +586,8 @@ struct TUdpSocketObj : public TSocketObjBase
 	CBufferObjPool&		itPool;
 
 	CRWLock				lcIo;
-	CReentrantCriSec	csSend;
+	CRWLock				lcSend;
+	CCriSec				csSend;
 
 	TBufferObjList		sndBuff;
 	CRecvQueue			recvQueue;
@@ -595,7 +643,8 @@ struct TUdpSocketObj : public TSocketObjBase
 			pSocketObj->SetConnected(FALSE);
 
 			CReentrantWriteLock	 locallock(pSocketObj->lcIo);
-			CReentrantCriSecLock locallock2(pSocketObj->csSend);
+			CReentrantWriteLock	 locallock2(pSocketObj->lcSend);
+			CCriSecLock			 locallock3(pSocketObj->csSend);
 
 			if(TSocketObjBase::IsValid(pSocketObj))
 			{
@@ -647,6 +696,26 @@ typedef CRingCache2<TUdpSocketObj, CONNID, true>	TUdpSocketObjPtrPool;
 typedef CRingPool<TUdpSocketObj>					TUdpSocketObjPtrList;
 /* 失效 TUdpSocketObj 垃圾回收结构链表 */
 typedef CCASQueue<TUdpSocketObj>					TUdpSocketObjPtrQueue;
+
+/* 通信组件停止等待条件对象 */
+template<typename T> class CStopWaitingPredicate
+{
+public:
+	BOOL operator()()
+	{
+		return m_pThis->GetState() == SS_STOPPED;
+	}
+
+public:
+	CStopWaitingPredicate(T* pThis)
+	: m_pThis(pThis)
+	{
+
+	}
+
+private:
+	T* m_pThis;
+};
 
 /* HP_SOCKADDR 比较器 */
 struct hp_sockaddr_func
@@ -736,11 +805,32 @@ BOOL GetSocketAddress(SOCKET socket, LPTSTR lpszAddress, int& iAddressLen, USHOR
 BOOL GetSocketLocalAddress(SOCKET socket, LPTSTR lpszAddress, int& iAddressLen, USHORT& usPort);
 /* 获取 Socket 的远程地址信息 */
 BOOL GetSocketRemoteAddress(SOCKET socket, LPTSTR lpszAddress, int& iAddressLen, USHORT& usPort);
+/* 设置组播选项 */
+BOOL SetMultiCastSocketOptions(SOCKET sock, const HP_SOCKADDR& bindAddr, const HP_SOCKADDR& castAddr, int iMCTtl, BOOL bMCLoop);
 
 /* 64 位网络字节序转主机字节序 */
 ULONGLONG NToH64(ULONGLONG value);
 /* 64 位主机字节序转网络字节序 */
 ULONGLONG HToN64(ULONGLONG value);
+
+/* 短整型高低字节交换 */
+#define ENDIAN_SWAP_16(A)	((USHORT)((((USHORT)(A) & 0xff00) >> 8) | (((USHORT)(A) & 0x00ff) << 8)))
+/* 长整型高低字节交换 */
+#define ENDIAN_SWAP_32(A)	((((DWORD)(A) & 0xff000000) >> 24) | \
+							(((DWORD)(A) & 0x00ff0000) >>  8)  | \
+							(((DWORD)(A) & 0x0000ff00) <<  8)  | \
+							(((DWORD)(A) & 0x000000ff) << 24)	 )
+
+/* 检查是否小端字节序 */
+BOOL IsLittleEndian();
+/* 短整型主机字节序转小端字节序 */
+USHORT HToLE16(USHORT value);
+/* 短整型主机字节序转大端字节序 */
+USHORT HToBE16(USHORT value);
+/* 长整型主机字节序转小端字节序 */
+DWORD HToLE32(DWORD value);
+/* 长整型主机字节序转大端字节序 */
+DWORD HToBE32(DWORD value);
 
 HRESULT ReadSmallFile(LPCTSTR lpszFileName, CFile& file, CFileMapping& fmap, DWORD dwMaxFileSize = MAX_SMALL_FILE_SIZE);
 HRESULT MakeSmallFilePackage(LPCTSTR lpszFileName, CFile& file, CFileMapping& fmap, WSABUF szBuf[3], const LPWSABUF pHead = nullptr, const LPWSABUF pTail = nullptr);
@@ -760,11 +850,11 @@ int SSO_DontLinger			(SOCKET sock, BOOL bDont = TRUE);
 int SSO_Linger				(SOCKET sock, int l_onoff, int l_linger);
 int SSO_KeepAlive			(SOCKET sock, BOOL bKeepAlive = TRUE);
 int SSO_KeepAliveVals		(SOCKET sock, BOOL bOnOff, DWORD dwIdle, DWORD dwInterval, DWORD dwCount = 5);
-int SSO_ReuseAddress		(SOCKET sock, BOOL bReuse = TRUE);
+int SSO_ReuseAddress		(SOCKET sock, EnReuseAddressPolicy opt);
 int SSO_RecvBuffSize		(SOCKET sock, int size);
 int SSO_SendBuffSize		(SOCKET sock, int size);
-int SSO_RecvTimeout			(SOCKET sock, int sec, int microsec = 0);
-int SSO_SendTimeout			(SOCKET sock, int sec, int microsec = 0);
+int SSO_RecvTimeOut			(SOCKET sock, int ms);
+int SSO_SendTimeOut			(SOCKET sock, int ms);
 int SSO_GetError			(SOCKET sock);
 
 /* 生成 Connection ID */
@@ -803,6 +893,24 @@ BOOL Utf8ToGbk(const char szSrc[], char szDest[], int& iDestLength);
 
 #endif
 
+// 计算 Base64 编码后长度
+DWORD GuessBase64EncodeBound(DWORD dwSrcLen);
+// 计算 Base64 解码后长度
+DWORD GuessBase64DecodeBound(const BYTE* lpszSrc, DWORD dwSrcLen);
+// Base64 编码（返回值：0 -> 成功，-3 -> 输入数据不正确，-5 -> 输出缓冲区不足）
+int Base64Encode(const BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen);
+// Base64 解码（返回值：0 -> 成功，-3 -> 输入数据不正确，-5 -> 输出缓冲区不足）
+int Base64Decode(const BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen);
+
+// 计算 URL 编码后长度
+DWORD GuessUrlEncodeBound(const BYTE* lpszSrc, DWORD dwSrcLen);
+// 计算 URL 解码后长度
+DWORD GuessUrlDecodeBound(const BYTE* lpszSrc, DWORD dwSrcLen);
+// URL 编码（返回值：0 -> 成功，-3 -> 输入数据不正确，-5 -> 输出缓冲区不足）
+int UrlEncode(BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen);
+// URL 解码（返回值：0 -> 成功，-3 -> 输入数据不正确，-5 -> 输出缓冲区不足）
+int UrlDecode(BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen);
+
 #ifdef _ZLIB_SUPPORT
 
 // 普通压缩（返回值：0 -> 成功，-3 -> 输入数据不正确，-5 -> 输出缓冲区不足）
@@ -825,20 +933,15 @@ DWORD GZipGuessUncompressBound(const BYTE* lpszSrc, DWORD dwSrcLen);
 
 #endif
 
-// 计算 Base64 编码后长度
-DWORD GuessBase64EncodeBound(DWORD dwSrcLen);
-// 计算 Base64 解码后长度
-DWORD GuessBase64DecodeBound(const BYTE* lpszSrc, DWORD dwSrcLen);
-// Base64 编码（返回值：0 -> 成功，-3 -> 输入数据不正确，-5 -> 输出缓冲区不足）
-int Base64Encode(const BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen);
-// Base64 解码（返回值：0 -> 成功，-3 -> 输入数据不正确，-5 -> 输出缓冲区不足）
-int Base64Decode(const BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen);
+#ifdef _BROTLI_SUPPORT
 
-// 计算 URL 编码后长度
-DWORD GuessUrlEncodeBound(const BYTE* lpszSrc, DWORD dwSrcLen);
-// 计算 URL 解码后长度
-DWORD GuessUrlDecodeBound(const BYTE* lpszSrc, DWORD dwSrcLen);
-// URL 编码（返回值：0 -> 成功，-3 -> 输入数据不正确，-5 -> 输出缓冲区不足）
-int UrlEncode(BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen);
-// URL 解码（返回值：0 -> 成功，-3 -> 输入数据不正确，-5 -> 输出缓冲区不足）
-int UrlDecode(BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen);
+// Brotli 压缩（返回值：0 -> 成功，-3 -> 输入数据不正确，-5 -> 输出缓冲区不足）
+int BrotliCompress(const BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen);
+// Brotli 高级压缩（返回值：0 -> 成功，-3 -> 输入数据不正确，-5 -> 输出缓冲区不足）
+int BrotliCompressEx(const BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen, int iQuality = BROTLI_DEFAULT_QUALITY, int iWindow = BROTLI_DEFAULT_WINDOW, BrotliEncoderMode enMode = BROTLI_DEFAULT_MODE);
+// Brotli 解压（返回值：0 -> 成功，-3 -> 输入数据不正确，-5 -> 输出缓冲区不足）
+int BrotliUncompress(const BYTE* lpszSrc, DWORD dwSrcLen, BYTE* lpszDest, DWORD& dwDestLen);
+// Brotli 推测压缩结果长度
+DWORD BrotliGuessCompressBound(DWORD dwSrcLen);
+
+#endif
